@@ -23,6 +23,18 @@ Example:
 XAI_API_KEY=... npx climage "A cat in a tree" --provider xai
 ```
 
+### Google (Imagen)
+
+Set one of:
+- `GEMINI_API_KEY` (preferred)
+- `GOOGLE_API_KEY`
+
+Example:
+
+```bash
+GEMINI_API_KEY=... npx climage "A cat in a tree" --provider google --model imagen-4.0-generate-001
+```
+
 ### fal.ai
 
 Set one of:
