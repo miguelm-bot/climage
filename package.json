@@ -27,6 +27,7 @@
     "lint": "node -e \"console.log('no lint configured')\""
   },
   "dependencies": {
+    "@fal-ai/client": "^1.8.4",
     "dotenv": "^17.2.2"
   },
   "devDependencies": {

@@ -5,8 +5,9 @@ import { loadEnv } from './env.js'
 import { makeOutputPath, resolveOutDir, writeImageFile } from './output.js'
 import { slugify, timestampLocalCompact } from './strings.js'
 import { xaiProvider } from '../providers/xai.js'
+import { falProvider } from '../providers/fal.js'
 
-const providers: Provider[] = [xaiProvider]
+const providers: Provider[] = [xaiProvider, falProvider]
 
 export function listProviders(): Provider[] {
   return [...providers]

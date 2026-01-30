@@ -23,6 +23,18 @@ Example:
 XAI_API_KEY=... npx climage "A cat in a tree" --provider xai
 ```
 
+### fal.ai
+
+Set one of:
+- `FAL_KEY` (preferred by fal docs)
+- `FAL_API_KEY` (also common)
+
+Example:
+
+```bash
+FAL_KEY=... npx climage "A cat in a tree" --provider fal
+```
+
 ## Options
 
 - `--provider auto|xai|fal|google`
