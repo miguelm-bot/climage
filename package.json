@@ -1,0 +1,37 @@
+{
+  "name": "climage",
+  "version": "0.1.0",
+  "description": "Generate images from the terminal via multiple providers (xAI, Google, fal)",
+  "license": "MIT",
+  "author": "",
+  "type": "module",
+  "bin": {
+    "climage": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "node --enable-source-maps dist/cli.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "node -e \"console.log('no lint configured')\""
+  },
+  "dependencies": {
+    "dotenv": "^17.2.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.1.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.2"
+  }
+}
