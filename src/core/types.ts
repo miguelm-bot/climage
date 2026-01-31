@@ -1,4 +1,4 @@
-export type ProviderId = 'auto' | 'xai' | 'fal' | 'google';
+export type ProviderId = 'auto' | 'xai' | 'fal' | 'google' | 'openai';
 
 export type ImageFormat = 'png' | 'jpg' | 'webp';
 

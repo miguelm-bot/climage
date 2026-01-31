@@ -32,6 +32,7 @@ Env:
   GEMINI_API_KEY (or GOOGLE_API_KEY)
   XAI_API_KEY (or XAI_TOKEN, GROK_API_KEY)
   FAL_KEY (or FAL_API_KEY)
+  OPENAI_API_KEY
 
 Examples:
   npx climage "make image of kitten"

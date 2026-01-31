@@ -15,8 +15,9 @@ import { slugify, timestampLocalCompact } from './strings.js';
 import { xaiProvider } from '../providers/xai.js';
 import { falProvider } from '../providers/fal.js';
 import { googleProvider } from '../providers/google.js';
+import { openaiProvider } from '../providers/openai.js';
 
-const providers: Provider[] = [googleProvider, xaiProvider, falProvider];
+const providers: Provider[] = [googleProvider, xaiProvider, falProvider, openaiProvider];
 
 export function listProviders(): Provider[] {
   return [...providers];

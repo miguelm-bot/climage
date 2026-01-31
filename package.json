@@ -1,6 +1,6 @@
 {
   "name": "climage",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Generate images from the terminal via multiple providers (xAI, Google, fal)",
   "license": "MIT",
   "author": "",
