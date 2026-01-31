@@ -49,6 +49,7 @@ function mapAspectRatioToSize(aspectRatio?: string, model?: string): string | un
 export const openaiProvider: Provider = {
   id: 'openai',
   displayName: 'OpenAI (GPT Image / DALL-E)',
+  supports: ['image'],
   isAvailable(env) {
     return Boolean(getOpenAIApiKey(env));
   },
@@ -89,6 +90,7 @@ export const openaiProvider: Provider = {
     if (!json.data?.length) throw new Error('OpenAI returned no images');
 
     const results = [] as Array<{
+      kind: 'image';
       provider: 'openai';
       model?: string;
       index: number;
@@ -103,6 +105,7 @@ export const openaiProvider: Provider = {
       if (img.url) {
         const dl = await downloadBytes(img.url);
         results.push({
+          kind: 'image',
           provider: 'openai',
           model,
           index: i,
@@ -114,7 +117,7 @@ export const openaiProvider: Provider = {
       }
       if (img.b64_json) {
         const bytes = Uint8Array.from(Buffer.from(img.b64_json, 'base64'));
-        results.push({ provider: 'openai', model, index: i, bytes });
+        results.push({ kind: 'image', provider: 'openai', model, index: i, bytes });
         continue;
       }
       throw new Error('OpenAI returned image without url or b64_json');

@@ -7,7 +7,7 @@ function getGeminiApiKey(env: ProviderEnv): string | undefined {
   return env.GEMINI_API_KEY || env.GOOGLE_API_KEY || env.GOOGLE_GENAI_API_KEY;
 }
 
-function mimeForFormat(format: GenerateRequest['format']): string {
+function mimeForImageFormat(format: GenerateRequest['format']): string {
   switch (format) {
     case 'jpg':
       return 'image/jpeg';
@@ -44,6 +44,7 @@ function isGeminiImageModel(model: string): boolean {
 export const googleProvider: Provider = {
   id: 'google',
   displayName: 'Google (Nano Banana / Imagen)',
+  supports: ['image'],
   isAvailable(env) {
     return Boolean(getGeminiApiKey(env));
   },
@@ -71,6 +72,7 @@ async function generateWithGemini(
   req: GenerateRequest
 ): Promise<
   Array<{
+    kind: 'image';
     provider: 'google';
     model?: string;
     index: number;
@@ -79,6 +81,7 @@ async function generateWithGemini(
   }>
 > {
   const out: Array<{
+    kind: 'image';
     provider: 'google';
     model?: string;
     index: number;
@@ -115,11 +118,12 @@ async function generateWithGemini(
             ? Uint8Array.from(Buffer.from(rawBytes, 'base64'))
             : rawBytes;
         out.push({
+          kind: 'image',
           provider: 'google',
           model,
           index: i,
           bytes,
-          mimeType: part.inlineData.mimeType ?? mimeForFormat(req.format),
+          mimeType: part.inlineData.mimeType ?? mimeForImageFormat(req.format),
         });
         break; // One image per call
       }
@@ -137,6 +141,7 @@ async function generateWithImagen(
   req: GenerateRequest
 ): Promise<
   Array<{
+    kind: 'image';
     provider: 'google';
     model?: string;
     index: number;
@@ -149,7 +154,7 @@ async function generateWithImagen(
     prompt: req.prompt,
     config: {
       numberOfImages: req.n,
-      outputMimeType: mimeForFormat(req.format),
+      outputMimeType: mimeForImageFormat(req.format),
       // Imagen 4 supports aspectRatio
       ...(req.aspectRatio ? { aspectRatio: req.aspectRatio } : {}),
     },
@@ -159,6 +164,7 @@ async function generateWithImagen(
   if (!imgs?.length) throw new Error('Google generateImages returned no images');
 
   const out: Array<{
+    kind: 'image';
     provider: 'google';
     model?: string;
     index: number;
@@ -174,11 +180,12 @@ async function generateWithImagen(
     const bytes =
       typeof rawBytes === 'string' ? Uint8Array.from(Buffer.from(rawBytes, 'base64')) : rawBytes;
     out.push({
+      kind: 'image',
       provider: 'google',
       model,
       index: i,
       bytes,
-      mimeType: mimeForFormat(req.format),
+      mimeType: mimeForImageFormat(req.format),
     });
   }
 

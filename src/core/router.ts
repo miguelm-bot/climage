@@ -3,14 +3,16 @@ import path from 'node:path';
 import type {
   GenerateOptions,
   GenerateRequest,
-  GeneratedImage,
-  GeneratedImagePartial,
+  GeneratedMedia,
+  GeneratedMediaPartial,
+  MediaKind,
+  OutputFormat,
   Provider,
   ProviderEnv,
   ProviderId,
 } from './types.js';
 import { loadEnv } from './env.js';
-import { makeOutputPath, resolveOutDir, writeImageFile } from './output.js';
+import { makeOutputPath, resolveOutDir, writeMediaFile } from './output.js';
 import { slugify, timestampLocalCompact } from './strings.js';
 import { xaiProvider } from '../providers/xai.js';
 import { falProvider } from '../providers/fal.js';
@@ -39,11 +41,17 @@ export function pickProvider(id: ProviderId, env: ProviderEnv): Provider {
   return p;
 }
 
+function defaultFormatForKind(kind: MediaKind): OutputFormat {
+  return kind === 'video' ? 'mp4' : 'png';
+}
+
 function normalizeOptions(prompt: string, opts: GenerateOptions): GenerateRequest {
   const nRaw = opts.n ?? 1;
   const n = Math.max(1, Math.min(10, Math.floor(nRaw)));
 
-  const format = opts.format ?? 'png';
+  const kind = opts.kind ?? 'image';
+  const format = opts.format ?? defaultFormatForKind(kind);
+
   const outDir = resolveOutDir(opts.outDir ?? '.');
   const timestamp = timestampLocalCompact();
 
@@ -55,6 +63,7 @@ function normalizeOptions(prompt: string, opts: GenerateOptions): GenerateReques
     model: opts.model ?? undefined,
     n,
     aspectRatio: opts.aspectRatio ?? undefined,
+    kind,
     format,
     outDir,
     out: opts.out ? path.resolve(process.cwd(), opts.out) : undefined,
@@ -64,24 +73,42 @@ function normalizeOptions(prompt: string, opts: GenerateOptions): GenerateReques
   };
 }
 
-export async function generateImage(
+export async function generateMedia(
   prompt: string,
   opts: GenerateOptions = {}
-): Promise<GeneratedImage[]> {
+): Promise<GeneratedMedia[]> {
   const { env } = loadEnv(process.cwd());
   const req = normalizeOptions(prompt, opts);
   const provider = pickProvider(req.provider, env);
 
-  const partials = await provider.generate(req, env);
-  const images: GeneratedImage[] = [];
-
-  for (let i = 0; i < partials.length; i++) {
-    const p: GeneratedImagePartial | undefined = partials[i];
-    if (!p) continue;
-    const filePath = makeOutputPath(req, i);
-    await writeImageFile(filePath, p.bytes);
-    images.push({ ...p, filePath });
+  if (!provider.supports.includes(req.kind)) {
+    throw new Error(`Provider ${provider.id} does not support ${req.kind} generation`);
   }
 
-  return images;
+  const partials = await provider.generate(req, env);
+  const items: GeneratedMedia[] = [];
+
+  for (let i = 0; i < partials.length; i++) {
+    const p: GeneratedMediaPartial | undefined = partials[i];
+    if (!p) continue;
+    const filePath = makeOutputPath(req, i);
+    await writeMediaFile(filePath, p.bytes);
+    items.push({ ...p, filePath });
+  }
+
+  return items;
+}
+
+export async function generateImage(
+  prompt: string,
+  opts: GenerateOptions = {}
+): Promise<GeneratedMedia[]> {
+  return generateMedia(prompt, { ...opts, kind: 'image' });
+}
+
+export async function generateVideo(
+  prompt: string,
+  opts: GenerateOptions = {}
+): Promise<GeneratedMedia[]> {
+  return generateMedia(prompt, { ...opts, kind: 'video' });
 }

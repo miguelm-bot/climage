@@ -1,6 +1,6 @@
 # climage
 
-Generate images from the terminal via multiple AI providers.
+Generate images (and videos) from the terminal via multiple AI providers.
 
 ## Install / run
 
@@ -113,8 +113,10 @@ FAL_KEY=... npx climage "A cat in a tree" --provider fal
 - `--provider auto|google|openai|xai|fal`
 - `--model <id>`
 - `--n <1..10>`
-- `--format png|jpg|webp`
-- `--out <path>` (only for single image)
+- `--type image|video` (default: `image`)
+- `--video` (shortcut for `--type video`)
+- `--format png|jpg|webp|mp4|webm|gif`
+- `--out <path>` (only when `n=1`)
 - `--outDir <dir>` (default: current directory)
 - `--name <text>` base name override
 - `--aspect-ratio <w:h>` (e.g. `16:9`, `4:3`, `1:1`)

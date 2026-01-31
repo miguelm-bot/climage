@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import type { GeneratedImage, GenerateRequest } from './types.js';
+import type { GenerateRequest, GeneratedMedia } from './types.js';
 
 export function extensionForFormat(format: GenerateRequest['format']): string {
   switch (format) {
@@ -11,6 +11,12 @@ export function extensionForFormat(format: GenerateRequest['format']): string {
       return 'png';
     case 'webp':
       return 'webp';
+    case 'mp4':
+      return 'mp4';
+    case 'webm':
+      return 'webm';
+    case 'gif':
+      return 'gif';
   }
 }
 
@@ -28,7 +34,7 @@ export function makeOutputPath(req: GenerateRequest, index: number): string {
   return path.join(req.outDir, filename);
 }
 
-export async function writeImageFile(filePath: string, bytes: Uint8Array): Promise<void> {
+export async function writeMediaFile(filePath: string, bytes: Uint8Array): Promise<void> {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
   await fs.writeFile(filePath, bytes);
 }
@@ -43,9 +49,10 @@ export function redactUrl(url: string): string {
   }
 }
 
-export function toJsonResult(images: GeneratedImage[]) {
-  return {
-    images: images.map((img) => ({
+export function toJsonResult(items: GeneratedMedia[]) {
+  const images = items
+    .filter((i) => i.kind === 'image')
+    .map((img) => ({
       provider: img.provider,
       model: img.model,
       index: img.index,
@@ -53,6 +60,22 @@ export function toJsonResult(images: GeneratedImage[]) {
       url: img.url,
       bytes: img.bytes.byteLength,
       mimeType: img.mimeType,
-    })),
+    }));
+
+  const videos = items
+    .filter((i) => i.kind === 'video')
+    .map((vid) => ({
+      provider: vid.provider,
+      model: vid.model,
+      index: vid.index,
+      filePath: vid.filePath,
+      url: vid.url,
+      bytes: vid.bytes.byteLength,
+      mimeType: vid.mimeType,
+    }));
+
+  return {
+    ...(images.length ? { images } : {}),
+    ...(videos.length ? { videos } : {}),
   };
 }

@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import process from 'node:process';
 
-import { generateImage, listProviders } from './index.js';
+import { generateMedia, listProviders } from './index.js';
+import { toJsonResult } from './core/output.js';
 import type { GenerateOptions, ProviderId } from './core/types.js';
 
 function usage(code = 0) {
@@ -18,12 +19,15 @@ Usage:
 Options:
   --provider <auto|${providers}>   Provider (default: auto)
   --model <id>                    Model id (provider-specific)
-  --n <1..10>                     Number of images (default: 1)
-  --format <png|jpg|webp>         Output format (default: png)
+  --n <1..10>                     Number of outputs (default: 1)
+  --type <image|video>            Output type (default: image)
+  --video                         Shortcut for: --type video
+  --format <png|jpg|webp|mp4|webm|gif>
+                                 Output format (default: png for image, mp4 for video)
   --out <path>                    Output file path (only when n=1)
   --outDir <dir>                  Output directory (default: .)
   --name <text>                   Base name (slugified); default: prompt
-  --aspect-ratio <w:h>            Aspect ratio (xAI supports e.g. 4:3)
+  --aspect-ratio <w:h>            Aspect ratio (provider-specific)
   --json                          Print machine-readable JSON
   --verbose                       Verbose logging
   -h, --help                      Show help
@@ -37,6 +41,7 @@ Env:
 Examples:
   npx climage "make image of kitten"
   npx climage "A cat in a tree" --provider xai --n 4
+  npx climage "a cinematic shot of a corgi running" --provider fal --type video
 `);
   process.exit(code);
 }
@@ -74,6 +79,12 @@ function parseArgs(argv: string[]): { prompt: string; opts: GenerateOptions; jso
       case '--n':
         opts.n = Number(take(a));
         break;
+      case '--type':
+        opts.kind = take(a) as any;
+        break;
+      case '--video':
+        opts.kind = 'video';
+        break;
       case '--format':
         opts.format = take(a) as any;
         break;
@@ -106,15 +117,15 @@ function parseArgs(argv: string[]): { prompt: string; opts: GenerateOptions; jso
 async function main() {
   try {
     const { prompt, opts, json } = parseArgs(process.argv.slice(2));
-    const images = await generateImage(prompt, opts);
+    const items = await generateMedia(prompt, opts);
 
     if (json) {
-      process.stdout.write(JSON.stringify({ images }, null, 2) + '\n');
+      process.stdout.write(JSON.stringify(toJsonResult(items), null, 2) + '\n');
       return;
     }
 
-    for (const img of images) {
-      process.stdout.write(img.filePath + '\n');
+    for (const item of items) {
+      process.stdout.write(item.filePath + '\n');
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

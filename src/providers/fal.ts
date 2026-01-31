@@ -7,28 +7,44 @@ function getFalKey(env: ProviderEnv): string | undefined {
   return env.FAL_API_KEY || env.FAL_KEY;
 }
 
-type FalImage = {
+type FalMedia = {
   url: string;
   content_type?: string;
 };
 
 type FalResult = {
-  images?: FalImage[];
+  images?: FalMedia[];
+  image?: FalMedia;
+  videos?: FalMedia[];
+  video?: FalMedia;
 };
 
 async function downloadBytes(
   url: string
 ): Promise<{ bytes: Uint8Array; mimeType: string | undefined }> {
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`fal image download failed (${res.status})`);
+  if (!res.ok) throw new Error(`fal download failed (${res.status})`);
   const ab = await res.arrayBuffer();
   const ct = res.headers.get('content-type') || undefined;
   return { bytes: new Uint8Array(ab), mimeType: ct };
 }
 
+function pickMany(result: FalResult, kind: 'image' | 'video'): FalMedia[] {
+  if (kind === 'image') {
+    if (Array.isArray(result.images) && result.images.length) return result.images;
+    if (result.image?.url) return [result.image];
+    return [];
+  }
+
+  if (Array.isArray(result.videos) && result.videos.length) return result.videos;
+  if (result.video?.url) return [result.video];
+  return [];
+}
+
 export const falProvider: Provider = {
   id: 'fal',
   displayName: 'fal.ai',
+  supports: ['image', 'video'],
   isAvailable(env) {
     return Boolean(getFalKey(env));
   },
@@ -57,16 +73,20 @@ export const falProvider: Provider = {
     const input: Record<string, unknown> = {
       prompt: req.prompt,
       ...(image_size ? { image_size } : {}),
-      // Some fal models support "num_images"; flux/dev returns images array length.
-      ...(req.n ? { num_images: req.n } : {}),
+      // Some fal models support "num_images"; some video models use "num_videos".
+      ...(req.n ? { num_images: req.n, num_videos: req.n } : {}),
     };
 
     const result = (await fal.subscribe(model, { input })) as { data: FalResult };
 
-    const images = result?.data?.images;
-    if (!images?.length) throw new Error('fal returned no images');
+    const items = pickMany(result?.data ?? {}, req.kind);
+    if (!items?.length) {
+      const noun = req.kind === 'video' ? 'videos' : 'images';
+      throw new Error(`fal returned no ${noun}`);
+    }
 
     const out = [] as Array<{
+      kind: 'image' | 'video';
       provider: 'fal';
       model?: string;
       index: number;
@@ -75,22 +95,26 @@ export const falProvider: Provider = {
       mimeType?: string;
     }>;
 
-    for (let i = 0; i < Math.min(images.length, req.n); i++) {
-      const img = images[i];
-      if (!img?.url) continue;
-      const { bytes, mimeType } = await downloadBytes(img.url);
-      const finalMimeType = img.content_type ?? mimeType;
+    for (let i = 0; i < Math.min(items.length, req.n); i++) {
+      const m = items[i];
+      if (!m?.url) continue;
+      const { bytes, mimeType } = await downloadBytes(m.url);
+      const finalMimeType = m.content_type ?? mimeType;
       out.push({
+        kind: req.kind,
         provider: 'fal',
         model,
         index: i,
-        url: img.url,
+        url: m.url,
         bytes,
         ...(finalMimeType !== undefined ? { mimeType: finalMimeType } : {}),
       });
     }
 
-    if (!out.length) throw new Error('fal returned images but none were downloadable');
+    if (!out.length) {
+      const noun = req.kind === 'video' ? 'videos' : 'images';
+      throw new Error(`fal returned ${noun} but none were downloadable`);
+    }
 
     return out;
   },

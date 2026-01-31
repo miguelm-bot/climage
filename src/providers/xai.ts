@@ -29,6 +29,7 @@ async function downloadBytes(
 export const xaiProvider: Provider = {
   id: 'xai',
   displayName: 'xAI (Grok Imagine)',
+  supports: ['image'],
   isAvailable(env) {
     return Boolean(getXaiApiKey(env));
   },
@@ -65,6 +66,7 @@ export const xaiProvider: Provider = {
     if (!json.data?.length) throw new Error('xAI returned no images');
 
     const results = [] as Array<{
+      kind: 'image';
       provider: 'xai';
       model?: string;
       index: number;
@@ -79,6 +81,7 @@ export const xaiProvider: Provider = {
       if (img.url) {
         const { bytes, mimeType } = await downloadBytes(img.url);
         results.push({
+          kind: 'image',
           provider: 'xai',
           model,
           index: i,
@@ -90,7 +93,7 @@ export const xaiProvider: Provider = {
       }
       if (img.b64_json) {
         const bytes = Uint8Array.from(Buffer.from(img.b64_json, 'base64'));
-        results.push({ provider: 'xai', model, index: i, bytes });
+        results.push({ kind: 'image', provider: 'xai', model, index: i, bytes });
         continue;
       }
       throw new Error('xAI returned image without url or b64_json');
