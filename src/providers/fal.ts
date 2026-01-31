@@ -235,15 +235,17 @@ export const falProvider: Provider = {
     log(verbose, 'Calling fal.subscribe...');
     const startTime = Date.now();
 
-    const result = (await fal.subscribe(model, {
+    const subscribeOptions: Parameters<typeof fal.subscribe>[1] = {
       input,
       logs: verbose,
-      onQueueUpdate: verbose
-        ? (update) => {
-            log(true, 'Queue update:', update.status, JSON.stringify(update).slice(0, 200));
-          }
-        : undefined,
-    })) as { data: FalResult };
+    };
+    if (verbose) {
+      subscribeOptions.onQueueUpdate = (update) => {
+        log(true, 'Queue update:', update.status, JSON.stringify(update).slice(0, 200));
+      };
+    }
+
+    const result = (await fal.subscribe(model, subscribeOptions)) as { data: FalResult };
 
     log(verbose, `fal.subscribe completed in ${Date.now() - startTime}ms`);
     log(verbose, 'Raw result keys:', Object.keys(result?.data ?? {}));

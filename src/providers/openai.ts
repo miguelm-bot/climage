@@ -94,7 +94,7 @@ function mapAspectRatioToSize(aspectRatio?: string, model?: string): string | un
 const openaiCapabilities: ProviderCapabilities = {
   maxInputImages: 2, // image + optional mask
   supportsVideoInterpolation: false, // OpenAI doesn't support video
-  videoDurationRange: undefined, // No video support
+  // videoDurationRange omitted - no video support
   supportsImageEditing: true,
 };
 

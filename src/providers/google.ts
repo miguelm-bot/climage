@@ -347,11 +347,11 @@ async function generateWithGemini(
   }> = [];
 
   // Build contents - either text prompt or multimodal with image for editing
-  const buildContents = (): unknown => {
+  const buildContents = () => {
     if (hasInputImage && req.inputImages?.[0]) {
       // Multimodal content: image + text prompt for editing
       const imageData = imageToGoogleFormat(req.inputImages[0]);
-      return [{ ...imageData }, { text: req.prompt }];
+      return [{ ...imageData }, { text: req.prompt }] as const;
     }
     // Text-only prompt
     return req.prompt;
@@ -366,7 +366,7 @@ async function generateWithGemini(
     try {
       const res = await ai.models.generateContent({
         model,
-        contents: buildContents(),
+        contents: buildContents() as any,
         config: {
           responseModalities: ['IMAGE'],
         },
