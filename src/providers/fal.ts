@@ -1,6 +1,11 @@
 import { fal } from '@fal-ai/client';
 
-import type { GenerateRequest, Provider, ProviderEnv } from '../core/types.js';
+import type {
+  GenerateRequest,
+  Provider,
+  ProviderCapabilities,
+  ProviderEnv,
+} from '../core/types.js';
 
 function getFalKey(env: ProviderEnv): string | undefined {
   // community is split; support both
@@ -49,14 +54,138 @@ function pickMany(result: FalResult, kind: 'image' | 'video'): FalMedia[] {
   return [];
 }
 
-// Default models per kind
+// Default models per kind and input type
 const DEFAULT_IMAGE_MODEL = 'fal-ai/flux/dev';
+const DEFAULT_IMAGE_TO_IMAGE_MODEL = 'fal-ai/flux/dev/image-to-image';
 const DEFAULT_VIDEO_MODEL = 'fal-ai/ltxv-2/text-to-video/fast'; // LTX Video 2.0 Fast - very quick
+const DEFAULT_IMAGE_TO_VIDEO_MODEL = 'fal-ai/vidu/q2/image-to-video'; // Vidu Q2 for image-to-video
+const DEFAULT_START_END_VIDEO_MODEL = 'fal-ai/vidu/start-end-to-video'; // Vidu for start-end interpolation
+const DEFAULT_REFERENCE_VIDEO_MODEL = 'fal-ai/vidu/q2/reference-to-video'; // Vidu Q2 for reference images
+
+/**
+ * Determine the best model based on request inputs.
+ */
+function selectVideoModel(req: GenerateRequest): string {
+  // User specified model takes precedence
+  if (req.model) return req.model;
+
+  // Start + End frame → interpolation model
+  if (req.startFrame && req.endFrame) {
+    return DEFAULT_START_END_VIDEO_MODEL;
+  }
+
+  // Reference images (inputImages without startFrame) → reference-to-video
+  if (req.inputImages?.length && !req.startFrame) {
+    return DEFAULT_REFERENCE_VIDEO_MODEL;
+  }
+
+  // Start frame only → image-to-video
+  if (req.startFrame || req.inputImages?.length) {
+    return DEFAULT_IMAGE_TO_VIDEO_MODEL;
+  }
+
+  // No images → text-to-video
+  return DEFAULT_VIDEO_MODEL;
+}
+
+/**
+ * Determine the best image model based on request inputs.
+ */
+function selectImageModel(req: GenerateRequest): string {
+  if (req.model) return req.model;
+  if (req.inputImages?.length) return DEFAULT_IMAGE_TO_IMAGE_MODEL;
+  return DEFAULT_IMAGE_MODEL;
+}
+
+/**
+ * Map aspect ratio string to fal enum values.
+ */
+function mapAspectRatio(aspectRatio?: string): string | undefined {
+  if (!aspectRatio) return undefined;
+  const ar = aspectRatio.trim();
+  if (ar === '1:1') return 'square';
+  if (ar === '4:3') return 'landscape_4_3';
+  if (ar === '16:9') return 'landscape_16_9';
+  if (ar === '3:4') return 'portrait_4_3';
+  if (ar === '9:16') return 'portrait_16_9';
+  return ar; // Pass through if not mapped
+}
+
+/**
+ * Build input for video generation based on request parameters.
+ */
+function buildVideoInput(req: GenerateRequest): Record<string, unknown> {
+  const input: Record<string, unknown> = {
+    prompt: req.prompt,
+  };
+
+  // Start + End frame interpolation (Vidu start-end-to-video)
+  if (req.startFrame && req.endFrame) {
+    input.start_image_url = req.startFrame;
+    input.end_image_url = req.endFrame;
+    // Vidu supports movement_amplitude
+    return input;
+  }
+
+  // Reference images (Vidu reference-to-video)
+  if (req.inputImages?.length && !req.startFrame) {
+    input.reference_image_urls = req.inputImages.slice(0, 7); // Max 7 reference images
+    const ar = mapAspectRatio(req.aspectRatio);
+    if (ar) input.aspect_ratio = ar;
+    if (req.duration) input.duration = String(req.duration); // Vidu uses string enum
+    return input;
+  }
+
+  // Single image → image-to-video
+  const imageUrl = req.startFrame ?? req.inputImages?.[0];
+  if (imageUrl) {
+    input.image_url = imageUrl;
+    if (req.duration) input.duration = String(req.duration);
+    return input;
+  }
+
+  // Text-to-video
+  const imageSize = mapAspectRatio(req.aspectRatio);
+  if (imageSize) input.image_size = imageSize;
+  if (req.n) input.num_videos = req.n;
+
+  return input;
+}
+
+/**
+ * Build input for image generation based on request parameters.
+ */
+function buildImageInput(req: GenerateRequest): Record<string, unknown> {
+  const input: Record<string, unknown> = {
+    prompt: req.prompt,
+  };
+
+  const imageSize = mapAspectRatio(req.aspectRatio);
+  if (imageSize) input.image_size = imageSize;
+  if (req.n) input.num_images = req.n;
+
+  // Image-to-image: add input image
+  if (req.inputImages?.[0]) {
+    input.image_url = req.inputImages[0];
+    // Common i2i parameters
+    input.strength = 0.75; // Default strength for image-to-image
+  }
+
+  return input;
+}
+
+const falCapabilities: ProviderCapabilities = {
+  maxInputImages: 7, // Vidu supports up to 7 reference images
+  supportsVideoInterpolation: true, // Vidu start-end-to-video
+  videoDurationRange: [2, 8], // Vidu supports 2-8 seconds
+  supportsImageEditing: true,
+};
 
 export const falProvider: Provider = {
   id: 'fal',
   displayName: 'fal.ai',
   supports: ['image', 'video'],
+  capabilities: falCapabilities,
   isAvailable(env) {
     return Boolean(getFalKey(env));
   },
@@ -66,33 +195,42 @@ export const falProvider: Provider = {
 
     const verbose = req.verbose;
     log(verbose, 'Starting generation, kind:', req.kind, 'n:', req.n);
+    log(
+      verbose,
+      'Input images:',
+      req.inputImages?.length ?? 0,
+      'startFrame:',
+      !!req.startFrame,
+      'endFrame:',
+      !!req.endFrame
+    );
 
     // Configure credentials at runtime
     fal.config({ credentials: key });
 
-    // Default model depends on kind
-    const defaultModel = req.kind === 'video' ? DEFAULT_VIDEO_MODEL : DEFAULT_IMAGE_MODEL;
-    const model = req.model ?? defaultModel;
-    log(verbose, 'Using model:', model);
+    // Select model based on kind and inputs
+    const model = req.kind === 'video' ? selectVideoModel(req) : selectImageModel(req);
+    log(verbose, 'Selected model:', model);
 
-    // Map common aspect ratios to fal enums when possible.
-    let image_size: any = undefined;
-    if (req.aspectRatio) {
-      const ar = req.aspectRatio.trim();
-      if (ar === '1:1') image_size = 'square';
-      else if (ar === '4:3') image_size = 'landscape_4_3';
-      else if (ar === '16:9') image_size = 'landscape_16_9';
-      else if (ar === '3:4') image_size = 'portrait_4_3';
-      else if (ar === '9:16') image_size = 'portrait_16_9';
+    // Build input based on kind
+    const input = req.kind === 'video' ? buildVideoInput(req) : buildImageInput(req);
+
+    // Log input without large data URIs
+    const inputSummary = { ...input };
+    for (const key of ['image_url', 'start_image_url', 'end_image_url']) {
+      if (
+        typeof inputSummary[key] === 'string' &&
+        (inputSummary[key] as string).startsWith('data:')
+      ) {
+        inputSummary[key] = `data:...${(inputSummary[key] as string).length} chars`;
+      }
     }
-
-    const input: Record<string, unknown> = {
-      prompt: req.prompt,
-      ...(image_size ? { image_size } : {}),
-      // Some fal models support "num_images"; some video models use "num_videos".
-      ...(req.n ? { num_images: req.n, num_videos: req.n } : {}),
-    };
-    log(verbose, 'Request input:', JSON.stringify(input));
+    if (Array.isArray(inputSummary.reference_image_urls)) {
+      inputSummary.reference_image_urls = (inputSummary.reference_image_urls as string[]).map(
+        (url) => (url.startsWith('data:') ? `data:...${url.length} chars` : url)
+      );
+    }
+    log(verbose, 'Request input:', JSON.stringify(inputSummary));
 
     log(verbose, 'Calling fal.subscribe...');
     const startTime = Date.now();

@@ -126,6 +126,79 @@ FAL_KEY=... npx climage "A cat in a tree" --provider fal
 - `--aspect-ratio <w:h>` (e.g. `16:9`, `4:3`, `1:1`)
 - `--json`
 
+### Input Images
+
+- `--input <path>` Input image for editing or reference (can be used multiple times)
+- `--start-frame <path>` First frame image for video generation
+- `--end-frame <path>` Last frame image for video interpolation
+- `--duration <seconds>` Video duration in seconds
+
+## Image Editing
+
+Edit existing images by providing an input image:
+
+```bash
+# Edit with xAI
+npx climage "make the cat orange" --provider xai --input photo.jpg
+
+# Edit with Google Gemini
+npx climage "add a sunset background" --provider google --input photo.png
+
+# Edit with OpenAI (supports optional mask as second input)
+npx climage "replace the sky" --provider openai --input photo.png --input mask.png
+```
+
+## Image-to-Video
+
+Generate videos from images:
+
+```bash
+# Basic image-to-video with xAI
+npx climage "the cat walks away" --video --provider xai --start-frame cat.png
+
+# Image-to-video with Google Veo
+npx climage "the scene comes to life" --video --provider google --start-frame scene.png --duration 8
+
+# Image-to-video with fal.ai
+npx climage "dramatic camera zoom" --video --provider fal --start-frame photo.jpg
+```
+
+## Video Interpolation
+
+Create smooth transitions between two images (supported by Google Veo 3.1 and fal.ai):
+
+```bash
+# Interpolation with fal.ai Vidu
+npx climage "morphing transition" --video --provider fal --start-frame before.png --end-frame after.png
+
+# Interpolation with Google Veo 3.1
+npx climage "smooth transition" --video --provider google --start-frame a.png --end-frame b.png
+```
+
+## Reference Images
+
+Use multiple images as style/content references:
+
+```bash
+# Reference-guided video with Google Veo 3.1 (up to 3 images)
+npx climage "person walking in this style" --video --provider google --input style1.png --input style2.png
+
+# Reference-guided video with fal.ai Vidu (up to 7 images)
+npx climage "character in motion" --video --provider fal --input ref1.png --input ref2.png --input ref3.png
+```
+
+## Provider Capabilities
+
+| Feature                  | Google | xAI  | fal.ai | OpenAI |
+| ------------------------ | ------ | ---- | ------ | ------ |
+| Image Generation         | Yes    | Yes  | Yes    | Yes    |
+| Image Editing            | Yes    | Yes  | Yes    | Yes    |
+| Video Generation         | Yes    | Yes  | Yes    | No     |
+| Image-to-Video           | Yes    | Yes  | Yes    | No     |
+| Video Interpolation      | Yes    | No   | Yes    | No     |
+| Max Input Images         | 3      | 1    | 7      | 2      |
+| Video Duration (seconds) | 4-8    | 1-15 | 2-8    | N/A    |
+
 ## Library API
 
 ```ts

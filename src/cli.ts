@@ -32,6 +32,12 @@ Options:
   --verbose                       Verbose logging
   -h, --help                      Show help
 
+Input Images:
+  --input <path>                  Input image for editing or reference (repeatable)
+  --start-frame <path>            First frame image (for video generation)
+  --end-frame <path>              Last frame image (for video interpolation)
+  --duration <seconds>            Video duration in seconds (provider-specific)
+
 Env:
   GEMINI_API_KEY (or GOOGLE_API_KEY)
   XAI_API_KEY (or XAI_TOKEN, GROK_API_KEY)
@@ -42,6 +48,9 @@ Examples:
   npx climage "make image of kitten"
   npx climage "A cat in a tree" --provider xai --n 4
   npx climage "a cinematic shot of a corgi running" --provider fal --type video
+  npx climage "make the cat orange" --provider xai --input photo.jpg
+  npx climage "the cat walks away" --video --provider google --start-frame cat.png
+  npx climage "morphing transition" --video --provider fal --start-frame a.png --end-frame b.png
 `);
   process.exit(code);
 }
@@ -51,6 +60,7 @@ function parseArgs(argv: string[]): { prompt: string; opts: GenerateOptions; jso
   const opts: GenerateOptions = {};
   let json = false;
   const promptParts: string[] = [];
+  const inputImages: string[] = [];
 
   // Options that take a value
   const optionsWithValue = new Set([
@@ -63,6 +73,10 @@ function parseArgs(argv: string[]): { prompt: string; opts: GenerateOptions; jso
     '--outDir',
     '--name',
     '--aspect-ratio',
+    '--input',
+    '--start-frame',
+    '--end-frame',
+    '--duration',
   ]);
 
   let i = 0;
@@ -125,6 +139,18 @@ function parseArgs(argv: string[]): { prompt: string; opts: GenerateOptions; jso
         case '--aspect-ratio':
           opts.aspectRatio = v;
           break;
+        case '--input':
+          inputImages.push(v);
+          break;
+        case '--start-frame':
+          opts.startFrame = v;
+          break;
+        case '--end-frame':
+          opts.endFrame = v;
+          break;
+        case '--duration':
+          opts.duration = Number(v);
+          break;
       }
       i += 2;
       continue;
@@ -138,6 +164,11 @@ function parseArgs(argv: string[]): { prompt: string; opts: GenerateOptions; jso
     // Non-option = prompt part
     promptParts.push(a);
     i++;
+  }
+
+  // Add collected input images to opts
+  if (inputImages.length) {
+    opts.inputImages = inputImages;
   }
 
   const prompt = promptParts.join(' ').trim();

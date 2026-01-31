@@ -1,4 +1,9 @@
-import type { GenerateRequest, Provider, ProviderEnv } from '../core/types.js';
+import type {
+  GenerateRequest,
+  Provider,
+  ProviderCapabilities,
+  ProviderEnv,
+} from '../core/types.js';
 
 const XAI_API_BASE = 'https://api.x.ai/v1';
 
@@ -56,8 +61,11 @@ async function sleep(ms: number) {
 }
 
 async function generateXaiImages(req: GenerateRequest, apiKey: string) {
-  const model = req.model ?? 'grok-2-image';
-  log('Starting image generation, model:', model, 'n:', req.n);
+  // Use grok-imagine-image for editing (when image_url is provided)
+  const hasInputImage = req.inputImages?.length;
+  const defaultModel = hasInputImage ? 'grok-imagine-image' : 'grok-2-image';
+  const model = req.model ?? defaultModel;
+  log('Starting image generation, model:', model, 'n:', req.n, 'hasInputImage:', !!hasInputImage);
 
   const body: Record<string, unknown> = {
     model,
@@ -67,8 +75,10 @@ async function generateXaiImages(req: GenerateRequest, apiKey: string) {
     ...(req.aspectRatio ? { aspect_ratio: req.aspectRatio } : {}),
     // Use URL format to download + save.
     response_format: 'url',
+    // Add image_url for editing if input image provided
+    ...(hasInputImage && req.inputImages?.[0] ? { image_url: req.inputImages[0] } : {}),
   };
-  log('Request body:', JSON.stringify(body));
+  log('Request body:', JSON.stringify({ ...body, image_url: body.image_url ? '...' : undefined }));
 
   log('Calling xAI images/generations...');
   const startTime = Date.now();
@@ -137,15 +147,32 @@ async function generateXaiImages(req: GenerateRequest, apiKey: string) {
 
 async function generateXaiVideo(req: GenerateRequest, apiKey: string) {
   const model = req.model ?? 'grok-imagine-video';
-  log('Starting video generation, model:', model);
+
+  // Get image URL from startFrame or inputImages[0]
+  const imageUrl = req.startFrame ?? req.inputImages?.[0];
+  log(
+    'Starting video generation, model:',
+    model,
+    'hasImageUrl:',
+    !!imageUrl,
+    'duration:',
+    req.duration
+  );
 
   // xAI is async: create request_id, then poll /v1/videos/{request_id}
   const createBody: Record<string, unknown> = {
     prompt: req.prompt,
     model,
     ...(req.aspectRatio ? { aspect_ratio: req.aspectRatio } : {}),
+    // Add image_url for image-to-video
+    ...(imageUrl ? { image_url: imageUrl } : {}),
+    // Add duration (xAI supports 1-15 seconds)
+    ...(req.duration !== undefined ? { duration: req.duration } : {}),
   };
-  log('Request body:', JSON.stringify(createBody));
+  log(
+    'Request body:',
+    JSON.stringify({ ...createBody, image_url: createBody.image_url ? '...' : undefined })
+  );
 
   log('Calling xAI videos/generations...');
   const startTime = Date.now();
@@ -244,10 +271,18 @@ async function generateXaiVideo(req: GenerateRequest, apiKey: string) {
   ];
 }
 
+const xaiCapabilities: ProviderCapabilities = {
+  maxInputImages: 1,
+  supportsVideoInterpolation: false, // xAI does not support end frame
+  videoDurationRange: [1, 15], // 1-15 seconds
+  supportsImageEditing: true,
+};
+
 export const xaiProvider: Provider = {
   id: 'xai',
   displayName: 'xAI',
   supports: ['image', 'video'],
+  capabilities: xaiCapabilities,
   isAvailable(env) {
     return Boolean(getXaiApiKey(env));
   },

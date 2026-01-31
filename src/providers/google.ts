@@ -1,6 +1,11 @@
 import { GoogleGenAI } from '@google/genai';
 
-import type { GenerateRequest, Provider, ProviderEnv } from '../core/types.js';
+import type {
+  GenerateRequest,
+  Provider,
+  ProviderCapabilities,
+  ProviderEnv,
+} from '../core/types.js';
 
 function getGeminiApiKey(env: ProviderEnv): string | undefined {
   // Standard names + common aliases
@@ -32,7 +37,47 @@ const MODEL_ALIASES: Record<string, string> = {
   // Veo (video)
   veo2: 'veo-2.0-generate-001',
   'veo-2': 'veo-2.0-generate-001',
+  veo3: 'veo-3.0-generate-001',
+  'veo-3': 'veo-3.0-generate-001',
+  'veo-3.1': 'veo-3.1-generate-preview',
+  veo31: 'veo-3.1-generate-preview',
 };
+
+// Veo 3.1 models that support advanced features (interpolation, reference images)
+const VEO_31_MODELS = ['veo-3.1-generate-preview', 'veo-3.1-fast-generate-preview'];
+
+/**
+ * Check if model supports Veo 3.1 features (interpolation, reference images).
+ */
+function isVeo31Model(model: string): boolean {
+  return VEO_31_MODELS.some((m) => model.includes(m) || model.includes('veo-3.1'));
+}
+
+/**
+ * Parse a data URI and extract base64 data and mime type.
+ */
+function parseDataUri(dataUri: string): { data: string; mimeType: string } | null {
+  const match = dataUri.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return null;
+  return { mimeType: match[1] ?? 'image/png', data: match[2] ?? '' };
+}
+
+/**
+ * Convert image input (URL or data URI) to format suitable for Google API.
+ */
+function imageToGoogleFormat(
+  imageInput: string
+): { inlineData: { data: string; mimeType: string } } | { fileUri: string } {
+  // Data URI - extract base64
+  if (imageInput.startsWith('data:')) {
+    const parsed = parseDataUri(imageInput);
+    if (parsed) {
+      return { inlineData: { data: parsed.data, mimeType: parsed.mimeType } };
+    }
+  }
+  // URL - use as file URI
+  return { fileUri: imageInput };
+}
 
 // Gemini native image models (use generateContent with IMAGE modality)
 const GEMINI_IMAGE_MODELS = ['gemini-2.5-flash-image', 'gemini-3-pro-image-preview'];
@@ -63,10 +108,18 @@ async function sleep(ms: number) {
   await new Promise((r) => setTimeout(r, ms));
 }
 
+const googleCapabilities: ProviderCapabilities = {
+  maxInputImages: 3, // Veo 3.1 supports up to 3 reference images
+  supportsVideoInterpolation: true, // Veo 3.1 supports first + last frame
+  videoDurationRange: [4, 8], // Veo 3.1 supports 4, 6, 8 seconds
+  supportsImageEditing: true,
+};
+
 export const googleProvider: Provider = {
   id: 'google',
   displayName: 'Google (Gemini / Imagen / Veo)',
   supports: ['image', 'video'],
+  capabilities: googleCapabilities,
   isAvailable(env) {
     return Boolean(getGeminiApiKey(env));
   },
@@ -76,15 +129,33 @@ export const googleProvider: Provider = {
 
     verboseMode = req.verbose;
     log('Provider initialized, kind:', req.kind);
+    log(
+      'Input images:',
+      req.inputImages?.length ?? 0,
+      'startFrame:',
+      !!req.startFrame,
+      'endFrame:',
+      !!req.endFrame
+    );
 
     const ai = new GoogleGenAI({ apiKey });
 
     if (req.kind === 'video') {
-      const model = MODEL_ALIASES[req.model ?? ''] ?? req.model ?? 'veo-2.0-generate-001';
+      // Default to Veo 3.1 if using advanced features, otherwise Veo 2
+      const hasAdvancedFeatures = req.startFrame || req.endFrame || req.inputImages?.length;
+      const defaultModel = hasAdvancedFeatures
+        ? 'veo-3.1-generate-preview'
+        : 'veo-2.0-generate-001';
+      const model = MODEL_ALIASES[req.model ?? ''] ?? req.model ?? defaultModel;
       log('Using video model:', model);
-      log(
-        'WARNING: Google Veo video generation requires Vertex AI and is not available via AI Studio API'
-      );
+
+      // Warn if using advanced features with non-Veo 3.1 model
+      if (hasAdvancedFeatures && !isVeo31Model(model)) {
+        log(
+          'WARNING: Advanced video features (startFrame, endFrame, referenceImages) require Veo 3.1'
+        );
+      }
+
       return generateWithVeo(ai, model, req);
     }
 
@@ -122,16 +193,53 @@ async function generateWithVeo(
   log('Starting Veo video generation, model:', model, 'n:', req.n);
   const startTime = Date.now();
 
-  // The SDK returns a long-running operation. Poll until done.
-  log('Calling ai.models.generateVideos...');
-  let op = await ai.models.generateVideos({
+  // Build config for generateVideos
+  const config: Record<string, unknown> = {
+    numberOfVideos: req.n,
+    ...(req.aspectRatio ? { aspectRatio: req.aspectRatio } : {}),
+    // Add duration if specified (Veo 3.1 supports 4, 6, 8)
+    ...(req.duration !== undefined ? { durationSeconds: String(req.duration) } : {}),
+  };
+
+  // Build reference images array for Veo 3.1 (up to 3 images)
+  if (req.inputImages?.length && isVeo31Model(model)) {
+    const referenceImages = req.inputImages.slice(0, 3).map((img) => {
+      const imageData = imageToGoogleFormat(img);
+      return {
+        image: imageData,
+        referenceType: 'asset' as const,
+      };
+    });
+    (config as any).referenceImages = referenceImages;
+    log('Added', referenceImages.length, 'reference images');
+  }
+
+  // Build generateVideos params
+  const generateParams: Record<string, unknown> = {
     model,
     prompt: req.prompt,
-    config: {
-      numberOfVideos: req.n,
-      ...(req.aspectRatio ? { aspectRatio: req.aspectRatio } : {}),
-    },
-  });
+    config,
+  };
+
+  // Add image (first frame) for Veo 3.1 image-to-video
+  const firstFrameImage =
+    req.startFrame ?? (req.inputImages?.length === 1 ? req.inputImages[0] : undefined);
+  if (firstFrameImage && isVeo31Model(model)) {
+    const imageData = imageToGoogleFormat(firstFrameImage);
+    (generateParams as any).image = imageData;
+    log('Added first frame image');
+  }
+
+  // Add lastFrame for Veo 3.1 interpolation
+  if (req.endFrame && isVeo31Model(model)) {
+    const lastFrameData = imageToGoogleFormat(req.endFrame);
+    (config as any).lastFrame = lastFrameData;
+    log('Added last frame for interpolation');
+  }
+
+  // The SDK returns a long-running operation. Poll until done.
+  log('Calling ai.models.generateVideos...');
+  let op = await ai.models.generateVideos(generateParams as any);
 
   log('Initial operation state:', op.done ? 'done' : 'pending', 'name:', (op as any).name);
 
@@ -218,7 +326,15 @@ async function generateWithGemini(
     mimeType?: string;
   }>
 > {
-  log('Starting Gemini image generation, model:', model, 'n:', req.n);
+  const hasInputImage = req.inputImages?.length;
+  log(
+    'Starting Gemini image generation, model:',
+    model,
+    'n:',
+    req.n,
+    'hasInputImage:',
+    !!hasInputImage
+  );
   const startTime = Date.now();
 
   const out: Array<{
@@ -230,6 +346,17 @@ async function generateWithGemini(
     mimeType?: string;
   }> = [];
 
+  // Build contents - either text prompt or multimodal with image for editing
+  const buildContents = (): unknown => {
+    if (hasInputImage && req.inputImages?.[0]) {
+      // Multimodal content: image + text prompt for editing
+      const imageData = imageToGoogleFormat(req.inputImages[0]);
+      return [{ ...imageData }, { text: req.prompt }];
+    }
+    // Text-only prompt
+    return req.prompt;
+  };
+
   // Gemini native image generation produces one image per call
   // Generate sequentially for n > 1
   for (let i = 0; i < req.n; i++) {
@@ -239,7 +366,7 @@ async function generateWithGemini(
     try {
       const res = await ai.models.generateContent({
         model,
-        contents: req.prompt,
+        contents: buildContents(),
         config: {
           responseModalities: ['IMAGE'],
         },

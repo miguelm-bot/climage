@@ -12,7 +12,13 @@ import type {
   ProviderId,
 } from './types.js';
 import { loadEnv } from './env.js';
-import { makeOutputPath, resolveOutDir, writeMediaFile } from './output.js';
+import {
+  makeOutputPath,
+  resolveImageInput,
+  resolveImageInputs,
+  resolveOutDir,
+  writeMediaFile,
+} from './output.js';
 import { slugify, timestampLocalCompact } from './strings.js';
 import { xaiProvider } from '../providers/xai.js';
 import { falProvider } from '../providers/fal.js';
@@ -49,7 +55,11 @@ function defaultFormatForKind(kind: MediaKind): OutputFormat {
   return kind === 'video' ? 'mp4' : 'png';
 }
 
-function normalizeOptions(prompt: string, opts: GenerateOptions): GenerateRequest {
+async function normalizeOptions(
+  prompt: string,
+  opts: GenerateOptions,
+  verbose: boolean
+): Promise<GenerateRequest> {
   const nRaw = opts.n ?? 1;
   const n = Math.max(1, Math.min(10, Math.floor(nRaw)));
 
@@ -60,6 +70,28 @@ function normalizeOptions(prompt: string, opts: GenerateOptions): GenerateReques
   const timestamp = timestampLocalCompact();
 
   const nameBase = slugify(opts.name ?? prompt);
+
+  // Resolve input images (convert local paths to data URIs)
+  let inputImages: string[] | undefined;
+  if (opts.inputImages?.length) {
+    log(verbose, `Resolving ${opts.inputImages.length} input image(s)...`);
+    inputImages = await resolveImageInputs(opts.inputImages);
+    log(verbose, `Resolved input images`);
+  }
+
+  // Resolve start/end frames for video
+  let startFrame: string | undefined;
+  let endFrame: string | undefined;
+
+  if (opts.startFrame) {
+    log(verbose, `Resolving start frame: ${opts.startFrame}`);
+    startFrame = await resolveImageInput(opts.startFrame);
+  }
+
+  if (opts.endFrame) {
+    log(verbose, `Resolving end frame: ${opts.endFrame}`);
+    endFrame = await resolveImageInput(opts.endFrame);
+  }
 
   return {
     prompt,
@@ -74,7 +106,50 @@ function normalizeOptions(prompt: string, opts: GenerateOptions): GenerateReques
     nameBase,
     timestamp,
     verbose: Boolean(opts.verbose),
+    // New fields
+    inputImages,
+    startFrame,
+    endFrame,
+    duration: opts.duration,
   };
+}
+
+/**
+ * Validate request parameters against provider capabilities.
+ */
+function validateRequestForProvider(req: GenerateRequest, provider: Provider): void {
+  const caps = provider.capabilities;
+
+  // Validate input images count
+  const inputCount = req.inputImages?.length ?? 0;
+  if (inputCount > caps.maxInputImages) {
+    throw new Error(
+      `Provider ${provider.id} supports max ${caps.maxInputImages} input image(s), but ${inputCount} provided`
+    );
+  }
+
+  // Validate video interpolation (start + end frame)
+  if (req.endFrame && !caps.supportsVideoInterpolation) {
+    throw new Error(
+      `Provider ${provider.id} does not support video interpolation (end frame). ` +
+        `Only startFrame is supported for image-to-video.`
+    );
+  }
+
+  // Validate duration range
+  if (req.duration !== undefined && req.kind === 'video' && caps.videoDurationRange) {
+    const [min, max] = caps.videoDurationRange;
+    if (req.duration < min || req.duration > max) {
+      throw new Error(
+        `Provider ${provider.id} supports video duration ${min}-${max}s, but ${req.duration}s requested`
+      );
+    }
+  }
+
+  // Validate image editing support
+  if (req.kind === 'image' && inputCount > 0 && !caps.supportsImageEditing) {
+    throw new Error(`Provider ${provider.id} does not support image editing with input images`);
+  }
 }
 
 export async function generateMedia(
@@ -82,10 +157,26 @@ export async function generateMedia(
   opts: GenerateOptions = {}
 ): Promise<GeneratedMedia[]> {
   const { env } = loadEnv(process.cwd());
-  const req = normalizeOptions(prompt, opts);
-  const verbose = req.verbose;
+  const verbose = Boolean(opts.verbose);
 
-  log(verbose, 'Request:', JSON.stringify({ ...req, prompt: req.prompt.slice(0, 50) + '...' }));
+  // Normalize and resolve options (including reading input image files)
+  const req = await normalizeOptions(prompt, opts, verbose);
+
+  // Build a summary object for logging (truncate large data URIs)
+  const reqSummary = {
+    ...req,
+    prompt: req.prompt.slice(0, 50) + '...',
+    inputImages: req.inputImages?.map((img) =>
+      img.startsWith('data:') ? `data:...${img.length} chars` : img
+    ),
+    startFrame: req.startFrame?.startsWith('data:')
+      ? `data:...${req.startFrame.length} chars`
+      : req.startFrame,
+    endFrame: req.endFrame?.startsWith('data:')
+      ? `data:...${req.endFrame.length} chars`
+      : req.endFrame,
+  };
+  log(verbose, 'Request:', JSON.stringify(reqSummary));
 
   const provider = pickProvider(req.provider, env);
   log(verbose, 'Selected provider:', provider.id, '| supports:', provider.supports);
@@ -93,6 +184,9 @@ export async function generateMedia(
   if (!provider.supports.includes(req.kind)) {
     throw new Error(`Provider ${provider.id} does not support ${req.kind} generation`);
   }
+
+  // Validate request against provider capabilities
+  validateRequestForProvider(req, provider);
 
   log(verbose, 'Calling provider.generate()...');
   const startTime = Date.now();
