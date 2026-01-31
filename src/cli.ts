@@ -50,65 +50,97 @@ function parseArgs(argv: string[]): { prompt: string; opts: GenerateOptions; jso
   const args = [...argv];
   const opts: GenerateOptions = {};
   let json = false;
+  const promptParts: string[] = [];
 
-  const take = (name: string): string => {
-    const v = args.shift();
-    if (!v) throw new Error(`Missing value for ${name}`);
-    return v;
-  };
+  // Options that take a value
+  const optionsWithValue = new Set([
+    '--provider',
+    '--model',
+    '--n',
+    '--type',
+    '--format',
+    '--out',
+    '--outDir',
+    '--name',
+    '--aspect-ratio',
+  ]);
 
-  while (args.length) {
-    const a = args[0];
-    if (!a) break;
-    if (a === '-h' || a === '--help') usage(0);
-    if (a === '--json') {
-      json = true;
-      args.shift();
+  let i = 0;
+  while (i < args.length) {
+    const a = args[i];
+    if (!a) {
+      i++;
       continue;
     }
-    if (!a.startsWith('-')) break;
 
-    args.shift();
-    switch (a) {
-      case '--provider':
-        opts.provider = take(a) as ProviderId;
-        break;
-      case '--model':
-        opts.model = take(a);
-        break;
-      case '--n':
-        opts.n = Number(take(a));
-        break;
-      case '--type':
-        opts.kind = take(a) as any;
-        break;
-      case '--video':
-        opts.kind = 'video';
-        break;
-      case '--format':
-        opts.format = take(a) as any;
-        break;
-      case '--out':
-        opts.out = take(a);
-        break;
-      case '--outDir':
-        opts.outDir = take(a);
-        break;
-      case '--name':
-        opts.name = take(a);
-        break;
-      case '--aspect-ratio':
-        opts.aspectRatio = take(a);
-        break;
-      case '--verbose':
-        opts.verbose = true;
-        break;
-      default:
-        throw new Error(`Unknown option: ${a}`);
+    // Help
+    if (a === '-h' || a === '--help') usage(0);
+
+    // Boolean flags
+    if (a === '--json') {
+      json = true;
+      i++;
+      continue;
     }
+    if (a === '--video') {
+      opts.kind = 'video';
+      i++;
+      continue;
+    }
+    if (a === '--verbose') {
+      opts.verbose = true;
+      i++;
+      continue;
+    }
+
+    // Options with values
+    if (optionsWithValue.has(a)) {
+      const v = args[i + 1];
+      if (!v || v.startsWith('-')) throw new Error(`Missing value for ${a}`);
+      switch (a) {
+        case '--provider':
+          opts.provider = v as ProviderId;
+          break;
+        case '--model':
+          opts.model = v;
+          break;
+        case '--n':
+          opts.n = Number(v);
+          break;
+        case '--type':
+          opts.kind = v as any;
+          break;
+        case '--format':
+          opts.format = v as any;
+          break;
+        case '--out':
+          opts.out = v;
+          break;
+        case '--outDir':
+          opts.outDir = v;
+          break;
+        case '--name':
+          opts.name = v;
+          break;
+        case '--aspect-ratio':
+          opts.aspectRatio = v;
+          break;
+      }
+      i += 2;
+      continue;
+    }
+
+    // Unknown option
+    if (a.startsWith('-')) {
+      throw new Error(`Unknown option: ${a}`);
+    }
+
+    // Non-option = prompt part
+    promptParts.push(a);
+    i++;
   }
 
-  const prompt = args.join(' ').trim();
+  const prompt = promptParts.join(' ').trim();
   if (!prompt) throw new Error('Missing prompt');
 
   return { prompt, opts, json };

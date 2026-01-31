@@ -16,11 +16,20 @@ type OpenAIImagesResponse = {
   data: OpenAIImage[];
 };
 
+let verboseMode = false;
+
+function log(...args: unknown[]) {
+  if (verboseMode) console.error('[openai]', ...args);
+}
+
 async function downloadBytes(url: string): Promise<{ bytes: Uint8Array; mimeType?: string }> {
+  log('Downloading from:', url.slice(0, 100) + '...');
+  const start = Date.now();
   const res = await fetch(url);
   if (!res.ok) throw new Error(`OpenAI image download failed (${res.status})`);
   const ab = await res.arrayBuffer();
   const ct = res.headers.get('content-type');
+  log(`Downloaded ${ab.byteLength} bytes in ${Date.now() - start}ms, type: ${ct}`);
   return ct ? { bytes: new Uint8Array(ab), mimeType: ct } : { bytes: new Uint8Array(ab) };
 }
 
@@ -57,8 +66,12 @@ export const openaiProvider: Provider = {
     const apiKey = getOpenAIApiKey(env);
     if (!apiKey) throw new Error('Missing OpenAI API key. Set OPENAI_API_KEY.');
 
-    // Default to gpt-image-1.5 (latest), can be overridden to gpt-image-1, gpt-image-1-mini, dall-e-3 or dall-e-2
-    const model = req.model ?? 'gpt-image-1.5';
+    verboseMode = req.verbose;
+    log('Provider initialized, kind:', req.kind);
+
+    // Default to gpt-image-1 (stable), can be overridden to dall-e-3 or dall-e-2
+    const model = req.model ?? 'gpt-image-1';
+    log('Using model:', model);
 
     const size = mapAspectRatioToSize(req.aspectRatio, model);
 
@@ -71,6 +84,10 @@ export const openaiProvider: Provider = {
       // dall-e-2/3 support response_format
       ...(!model.startsWith('gpt-image') ? { response_format: 'url' } : {}),
     };
+    log('Request body:', JSON.stringify(body));
+
+    log('Calling OpenAI images/generations...');
+    const startTime = Date.now();
 
     const res = await fetch(`${OPENAI_API_BASE}/images/generations`, {
       method: 'POST',
@@ -81,12 +98,17 @@ export const openaiProvider: Provider = {
       body: JSON.stringify(body),
     });
 
+    log(`API responded in ${Date.now() - startTime}ms, status: ${res.status}`);
+
     if (!res.ok) {
       const txt = await res.text().catch(() => '');
+      log('Error response:', txt.slice(0, 1000));
       throw new Error(`OpenAI generations failed (${res.status}): ${txt.slice(0, 500)}`);
     }
 
     const json = (await res.json()) as OpenAIImagesResponse;
+    log('Response data count:', json.data?.length);
+
     if (!json.data?.length) throw new Error('OpenAI returned no images');
 
     const results = [] as Array<{
@@ -102,6 +124,7 @@ export const openaiProvider: Provider = {
     for (let i = 0; i < json.data.length; i++) {
       const img = json.data[i];
       if (!img) continue;
+      log(`Processing image ${i}...`);
       if (img.url) {
         const dl = await downloadBytes(img.url);
         results.push({
@@ -116,6 +139,7 @@ export const openaiProvider: Provider = {
         continue;
       }
       if (img.b64_json) {
+        log(`Image ${i} is base64 encoded, ${img.b64_json.length} chars`);
         const bytes = Uint8Array.from(Buffer.from(img.b64_json, 'base64'));
         results.push({ kind: 'image', provider: 'openai', model, index: i, bytes });
         continue;
@@ -123,6 +147,7 @@ export const openaiProvider: Provider = {
       throw new Error('OpenAI returned image without url or b64_json');
     }
 
+    log(`Successfully generated ${results.length} image(s)`);
     return results;
   },
 };

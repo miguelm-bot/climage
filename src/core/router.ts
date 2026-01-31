@@ -21,6 +21,10 @@ import { openaiProvider } from '../providers/openai.js';
 
 const providers: Provider[] = [googleProvider, xaiProvider, falProvider, openaiProvider];
 
+function log(verbose: boolean, ...args: unknown[]) {
+  if (verbose) console.error('[router]', ...args);
+}
+
 export function listProviders(): Provider[] {
   return [...providers];
 }
@@ -79,23 +83,36 @@ export async function generateMedia(
 ): Promise<GeneratedMedia[]> {
   const { env } = loadEnv(process.cwd());
   const req = normalizeOptions(prompt, opts);
+  const verbose = req.verbose;
+
+  log(verbose, 'Request:', JSON.stringify({ ...req, prompt: req.prompt.slice(0, 50) + '...' }));
+
   const provider = pickProvider(req.provider, env);
+  log(verbose, 'Selected provider:', provider.id, '| supports:', provider.supports);
 
   if (!provider.supports.includes(req.kind)) {
     throw new Error(`Provider ${provider.id} does not support ${req.kind} generation`);
   }
 
+  log(verbose, 'Calling provider.generate()...');
+  const startTime = Date.now();
+
   const partials = await provider.generate(req, env);
+
+  log(verbose, `Provider returned ${partials.length} items in ${Date.now() - startTime}ms`);
+
   const items: GeneratedMedia[] = [];
 
   for (let i = 0; i < partials.length; i++) {
     const p: GeneratedMediaPartial | undefined = partials[i];
     if (!p) continue;
     const filePath = makeOutputPath(req, i);
+    log(verbose, `Writing ${p.bytes.byteLength} bytes to: ${filePath}`);
     await writeMediaFile(filePath, p.bytes);
     items.push({ ...p, filePath });
   }
 
+  log(verbose, `Done! Generated ${items.length} ${req.kind}(s)`);
   return items;
 }
 

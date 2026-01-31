@@ -21,24 +21,33 @@ type XaiVideoGenerationResponse = {
 };
 
 type XaiVideoResultResponse = {
-  status?: 'pending' | 'done' | string;
-  response?: {
-    model?: string;
-    video?: {
-      duration?: number;
-      respect_moderation?: boolean;
-      url?: string | null;
-    };
-  } | null;
+  // When pending
+  status?: 'pending' | string;
+  // When complete - video info is at top level, not nested in response
+  video?: {
+    duration?: number;
+    respect_moderation?: boolean;
+    url?: string | null;
+  };
+  model?: string;
 };
+
+let verboseMode = false;
+
+function log(...args: unknown[]) {
+  if (verboseMode) console.error('[xai]', ...args);
+}
 
 async function downloadBytes(
   url: string
 ): Promise<{ bytes: Uint8Array; mimeType: string | undefined }> {
+  log('Downloading from:', url.slice(0, 100) + '...');
+  const start = Date.now();
   const res = await fetch(url);
   if (!res.ok) throw new Error(`xAI download failed (${res.status})`);
   const ab = await res.arrayBuffer();
   const ct = res.headers.get('content-type') || undefined;
+  log(`Downloaded ${ab.byteLength} bytes in ${Date.now() - start}ms, type: ${ct}`);
   return { bytes: new Uint8Array(ab), mimeType: ct };
 }
 
@@ -47,7 +56,9 @@ async function sleep(ms: number) {
 }
 
 async function generateXaiImages(req: GenerateRequest, apiKey: string) {
-  const model = req.model ?? 'grok-imagine-image';
+  const model = req.model ?? 'grok-2-image';
+  log('Starting image generation, model:', model, 'n:', req.n);
+
   const body: Record<string, unknown> = {
     model,
     prompt: req.prompt,
@@ -57,6 +68,10 @@ async function generateXaiImages(req: GenerateRequest, apiKey: string) {
     // Use URL format to download + save.
     response_format: 'url',
   };
+  log('Request body:', JSON.stringify(body));
+
+  log('Calling xAI images/generations...');
+  const startTime = Date.now();
 
   const res = await fetch(`${XAI_API_BASE}/images/generations`, {
     method: 'POST',
@@ -67,12 +82,17 @@ async function generateXaiImages(req: GenerateRequest, apiKey: string) {
     body: JSON.stringify(body),
   });
 
+  log(`API responded in ${Date.now() - startTime}ms, status: ${res.status}`);
+
   if (!res.ok) {
     const txt = await res.text().catch(() => '');
+    log('Error response:', txt.slice(0, 1000));
     throw new Error(`xAI generations failed (${res.status}): ${txt.slice(0, 500)}`);
   }
 
   const json = (await res.json()) as XaiImagesResponse;
+  log('Response data count:', json.data?.length);
+
   if (!json.data?.length) throw new Error('xAI returned no images');
 
   const results = [] as Array<{
@@ -88,6 +108,7 @@ async function generateXaiImages(req: GenerateRequest, apiKey: string) {
   for (let i = 0; i < json.data.length; i++) {
     const img = json.data[i];
     if (!img) continue;
+    log(`Processing image ${i}...`);
     if (img.url) {
       const { bytes, mimeType } = await downloadBytes(img.url);
       results.push({
@@ -102,6 +123,7 @@ async function generateXaiImages(req: GenerateRequest, apiKey: string) {
       continue;
     }
     if (img.b64_json) {
+      log(`Image ${i} is base64 encoded`);
       const bytes = Uint8Array.from(Buffer.from(img.b64_json, 'base64'));
       results.push({ kind: 'image', provider: 'xai', model, index: i, bytes });
       continue;
@@ -109,20 +131,24 @@ async function generateXaiImages(req: GenerateRequest, apiKey: string) {
     throw new Error('xAI returned image without url or b64_json');
   }
 
+  log(`Successfully generated ${results.length} image(s)`);
   return results;
 }
 
 async function generateXaiVideo(req: GenerateRequest, apiKey: string) {
   const model = req.model ?? 'grok-imagine-video';
+  log('Starting video generation, model:', model);
 
   // xAI is async: create request_id, then poll /v1/videos/{request_id}
   const createBody: Record<string, unknown> = {
     prompt: req.prompt,
     model,
     ...(req.aspectRatio ? { aspect_ratio: req.aspectRatio } : {}),
-    // docs default duration: 6
-    duration: 6,
   };
+  log('Request body:', JSON.stringify(createBody));
+
+  log('Calling xAI videos/generations...');
+  const startTime = Date.now();
 
   const createRes = await fetch(`${XAI_API_BASE}/videos/generations`, {
     method: 'POST',
@@ -133,20 +159,26 @@ async function generateXaiVideo(req: GenerateRequest, apiKey: string) {
     body: JSON.stringify(createBody),
   });
 
+  log(`API responded in ${Date.now() - startTime}ms, status: ${createRes.status}`);
+
   if (!createRes.ok) {
     const txt = await createRes.text().catch(() => '');
+    log('Error response:', txt.slice(0, 1000));
     throw new Error(`xAI video generations failed (${createRes.status}): ${txt.slice(0, 500)}`);
   }
 
   const createJson = (await createRes.json()) as XaiVideoGenerationResponse;
   const requestId = createJson.request_id;
+  log('Got request_id:', requestId);
   if (!requestId) throw new Error('xAI video generation returned no request_id');
 
-  // Poll (best-effort). Keep this bounded so CLI doesn't hang forever.
-  const maxAttempts = 60; // ~3 minutes at 3s interval
+  // Poll (best-effort). Video generation can take a while.
+  const maxAttempts = 120; // ~6 minutes at 3s interval
   const intervalMs = 3000;
 
   let result: XaiVideoResultResponse | undefined;
+  log(`Starting poll loop (max ${maxAttempts} attempts, ${intervalMs}ms interval)...`);
+
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const res = await fetch(`${XAI_API_BASE}/videos/${encodeURIComponent(requestId)}`, {
       method: 'GET',
@@ -157,37 +189,53 @@ async function generateXaiVideo(req: GenerateRequest, apiKey: string) {
 
     if (!res.ok) {
       const txt = await res.text().catch(() => '');
+      log(`Poll attempt ${attempt + 1} failed:`, txt.slice(0, 500));
       throw new Error(`xAI video poll failed (${res.status}): ${txt.slice(0, 500)}`);
     }
 
     const json = (await res.json()) as XaiVideoResultResponse;
     result = json;
 
-    if (json.status === 'done') break;
+    log(
+      `Poll attempt ${attempt + 1}/${maxAttempts}: status=${json.status}, raw:`,
+      JSON.stringify(json).slice(0, 300)
+    );
+
+    // xAI returns video object at top level (not nested in response) when complete
+    if (json.video?.url) {
+      log('Video generation complete!');
+      break;
+    }
+
+    if (json.status === 'failed' || json.status === 'error') {
+      log('Video generation failed:', JSON.stringify(json));
+      throw new Error(`xAI video generation failed: ${JSON.stringify(json)}`);
+    }
+
     await sleep(intervalMs);
   }
 
-  if (!result || result.status !== 'done') {
+  if (!result?.video?.url) {
+    log('Timed out. Last result:', JSON.stringify(result));
     throw new Error(`xAI video generation timed out (request_id=${requestId})`);
   }
 
-  const url = result.response?.video?.url ?? undefined;
-  if (!url) {
-    // moderation can result in empty url
-    const respected = result.response?.video?.respect_moderation;
-    if (respected === false) {
-      throw new Error('xAI video generation was blocked by moderation (no video url returned)');
-    }
-    throw new Error('xAI video generation completed but returned no video url');
+  const url = result.video.url;
+  log('Video URL:', url);
+
+  // Check moderation status
+  if (result.video?.respect_moderation === false) {
+    throw new Error('xAI video generation was blocked by moderation');
   }
 
   const { bytes, mimeType } = await downloadBytes(url);
 
+  log(`Successfully generated video, ${bytes.byteLength} bytes`);
   return [
     {
       kind: 'video' as const,
       provider: 'xai' as const,
-      model: result.response?.model ?? model,
+      model: result.model ?? model,
       index: 0,
       url,
       bytes,
@@ -206,6 +254,9 @@ export const xaiProvider: Provider = {
   async generate(req: GenerateRequest, env: ProviderEnv) {
     const apiKey = getXaiApiKey(env);
     if (!apiKey) throw new Error('Missing xAI API key. Set XAI_API_KEY (or XAI_TOKEN).');
+
+    verboseMode = req.verbose;
+    log('Provider initialized, kind:', req.kind);
 
     if (req.kind === 'video') return generateXaiVideo(req, apiKey);
     return generateXaiImages(req, apiKey);
