@@ -1,21 +1,26 @@
 ---
 name: climage
-description: Generate images from the terminal or code using climage. Use when the user asks to generate, create, or make images, or mentions image generation, AI images, or climage.
+description: Generate images or videos from the terminal or code using climage. Use when the user asks to generate, create, or make images/videos, or mentions media generation, AI images, AI video, or climage.
 ---
 
 # climage
 
-Generate images via multiple AI providers (Google Nano Banana/Imagen, OpenAI GPT Image, xAI Grok, fal.ai).
+Generate images and videos via multiple AI providers (Google Nano Banana/Imagen/Veo, OpenAI GPT Image, xAI Grok, fal.ai).
 
 ## Quick Start
 
 ```bash
 npx climage "a cat wearing a top hat"
+
+# video
+npx climage "a cinematic shot of a corgi running" --type video
 ```
 
 ## Providers & Models
 
 ### Google (Default Provider)
+
+**Images**
 
 | Model                           | Alias             | Description                                          |
 | ------------------------------- | ----------------- | ---------------------------------------------------- |
@@ -25,7 +30,16 @@ npx climage "a cat wearing a top hat"
 | `imagen-4.0-ultra-generate-001` | -                 | Imagen 4 Ultra                                       |
 | `imagen-4.0-fast-generate-001`  | -                 | Imagen 4 Fast                                        |
 
+**Video (Veo)**
+
+| Model                      | Alias     | Description                  |
+| -------------------------- | --------- | ---------------------------- |
+| `veo-3.1-generate-preview` | `veo3.1`  | **Default.** Preview channel |
+| `veo-3.1-generate-preview` | `veo-3.1` | Preview channel alias        |
+
 ### OpenAI
+
+(Image only)
 
 | Model              | Description                                     |
 | ------------------ | ----------------------------------------------- |
@@ -35,11 +49,14 @@ npx climage "a cat wearing a top hat"
 
 ### xAI
 
-| Model                | Description                          |
-| -------------------- | ------------------------------------ |
-| `grok-imagine-image` | **Default.** Grok's image generation |
+| Model                | Kind  | Description                          |
+| -------------------- | ----- | ------------------------------------ |
+| `grok-imagine-image` | image | **Default.** Grok's image generation |
+| `grok-imagine-video` | video | **Default.** Grok's video generation |
 
 ### fal.ai
+
+(Depends on model; many support image and/or video)
 
 | Model                 | Description               |
 | --------------------- | ------------------------- |
@@ -59,15 +76,21 @@ npx climage "a cat wearing a top hat"
 ## CLI Options
 
 ```
---provider <auto|google|openai|xai|fal>  Provider selection
---model <id>                             Model id (provider-specific)
---n <1..10>                              Number of images
---format <png|jpg|webp>                  Output format (default: png)
---out <path>                             Output file (single image only)
---outDir <dir>                           Output directory (default: .)
---name <text>                            Base filename
---aspect-ratio <w:h>                     Aspect ratio (e.g. 4:3, 16:9)
---json                                   JSON output
+--provider <auto|google|openai|xai|fal>     Provider selection
+--model <id>                               Model id (provider-specific)
+--n <1..10>                                Number of outputs
+--type <image|video>                       Output type (default: image)
+--video                                    Shortcut for: --type video
+--format <png|jpg|webp|mp4|webm|gif>       Output format (default: png for image, mp4 for video)
+--out <path>                               Output file (only when n=1)
+--outDir <dir>                             Output directory (default: .)
+--name <text>                              Base filename
+--aspect-ratio <w:h>                       Aspect ratio (provider-specific)
+--input <path>                             Input image for editing (repeatable)
+--start-frame <path>                       Start frame image for video
+--end-frame <path>                         End frame image for video interpolation
+--duration <seconds>                       Video duration in seconds
+--json                                     JSON output
 ```
 
 ## Examples
@@ -79,21 +102,78 @@ npx climage "sunset over mountains"
 # Fast generation with Nano Banana
 npx climage "sunset over mountains" --model nano-banana
 
-# OpenAI GPT Image
-npx climage "cyberpunk cityscape" --provider openai
+# Google video (Veo)
+npx climage "a neon hologram of a cat driving" --video
 
-# Multiple images with custom aspect ratio
-npx climage "wide landscape" --n 4 --aspect-ratio 16:9 --outDir ./images
+# xAI video
+npx climage "a cat playing with a ball" --provider xai --video
+
+# Multiple outputs with custom aspect ratio
+npx climage "wide landscape" --n 4 --aspect-ratio 16:9 --outDir ./out
 
 # JSON output for scripting
 npx climage "logo design" --json
 ```
 
+## Image Editing
+
+Edit existing images with a text prompt:
+
+```bash
+# Edit with Google
+npx climage "add a sunset background" --provider google --input photo.png
+
+# Edit with xAI
+npx climage "make the cat blue" --provider xai --input cat.jpg
+
+# Edit with OpenAI (supports optional mask as second input)
+npx climage "replace the sky" --provider openai --input photo.png --input mask.png
+```
+
+## Image-to-Video
+
+Generate videos from images:
+
+```bash
+# Google Veo with start frame
+npx climage "the scene comes to life" --video --provider google --start-frame scene.png --duration 8
+
+# fal.ai with start frame
+npx climage "camera slowly zooms in" --video --provider fal --start-frame photo.jpg
+
+# xAI with start frame
+npx climage "animate this image" --video --provider xai --start-frame cat.png --duration 5
+```
+
+## Video Interpolation
+
+Create smooth transitions between two images (fal.ai and Google Veo):
+
+```bash
+# fal.ai Vidu interpolation
+npx climage "smooth transition" --video --provider fal --start-frame before.png --end-frame after.png
+
+# Google Veo interpolation
+npx climage "morph between frames" --video --provider google --start-frame a.png --end-frame b.png
+```
+
+## Provider Capabilities
+
+| Feature             | Google | xAI | fal.ai | OpenAI |
+| ------------------- | ------ | --- | ------ | ------ |
+| Image Generation    | Yes    | Yes | Yes    | Yes    |
+| Image Editing       | Yes    | Yes | Yes    | Yes    |
+| Video Generation    | Yes    | Yes | Yes    | No     |
+| Image-to-Video      | Yes    | Yes | Yes    | No     |
+| Video Interpolation | Yes    | No  | Yes    | No     |
+| Max Input Images    | 3      | 1   | 7      | 2      |
+
 ## Library API
 
 ```ts
-import { generateImage } from 'climage';
+import { generateImage, generateVideo } from 'climage';
 
+// Basic image generation
 const images = await generateImage('a futuristic robot', {
   provider: 'google',
   model: 'nano-banana-pro',
@@ -101,13 +181,39 @@ const images = await generateImage('a futuristic robot', {
   format: 'webp',
 });
 
-for (const img of images) {
-  console.log(img.filePath);
+// Image editing
+const edited = await generateImage('make the sky purple', {
+  provider: 'google',
+  inputImages: ['./photo.png'],
+});
+
+// Video generation
+const videos = await generateVideo('a cinematic corgi running', {
+  provider: 'google',
+  n: 1,
+});
+
+// Image-to-video
+const animated = await generateVideo('the scene comes to life', {
+  provider: 'fal',
+  startFrame: './scene.png',
+  duration: 5,
+});
+
+// Video interpolation
+const interpolated = await generateVideo('smooth transition', {
+  provider: 'fal',
+  startFrame: './before.png',
+  endFrame: './after.png',
+});
+
+for (const item of [...images, ...videos]) {
+  console.log(item.filePath);
 }
 ```
 
 ## Output
 
 - CLI prints file paths to stdout (one per line)
-- With `--json`: `{ "images": [{ "filePath": "...", ... }] }`
+- With `--json`: `{ "images": [...], "videos": [...] }` (keys only present when applicable)
 - Files saved to current directory or `--outDir`

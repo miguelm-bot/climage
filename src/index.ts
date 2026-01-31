@@ -1,2 +1,10 @@
-export type { GenerateOptions, GeneratedImage, ProviderId, ImageFormat } from './core/types.js';
-export { generateImage, listProviders } from './core/router.js';
+export type {
+  GenerateOptions,
+  GeneratedMedia,
+  ProviderId,
+  MediaKind,
+  ImageFormat,
+  VideoFormat,
+  OutputFormat,
+} from './core/types.js';
+export { generateMedia, generateImage, generateVideo, listProviders } from './core/router.js';

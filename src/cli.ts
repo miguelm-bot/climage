@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import process from 'node:process';
 
-import { generateImage, listProviders } from './index.js';
+import { generateMedia, listProviders } from './index.js';
+import { toJsonResult } from './core/output.js';
 import type { GenerateOptions, ProviderId } from './core/types.js';
 
 function usage(code = 0) {
@@ -18,15 +19,24 @@ Usage:
 Options:
   --provider <auto|${providers}>   Provider (default: auto)
   --model <id>                    Model id (provider-specific)
-  --n <1..10>                     Number of images (default: 1)
-  --format <png|jpg|webp>         Output format (default: png)
+  --n <1..10>                     Number of outputs (default: 1)
+  --type <image|video>            Output type (default: image)
+  --video                         Shortcut for: --type video
+  --format <png|jpg|webp|mp4|webm|gif>
+                                 Output format (default: png for image, mp4 for video)
   --out <path>                    Output file path (only when n=1)
   --outDir <dir>                  Output directory (default: .)
   --name <text>                   Base name (slugified); default: prompt
-  --aspect-ratio <w:h>            Aspect ratio (xAI supports e.g. 4:3)
+  --aspect-ratio <w:h>            Aspect ratio (provider-specific)
   --json                          Print machine-readable JSON
   --verbose                       Verbose logging
   -h, --help                      Show help
+
+Input Images:
+  --input <path>                  Input image for editing or reference (repeatable)
+  --start-frame <path>            First frame image (for video generation)
+  --end-frame <path>              Last frame image (for video interpolation)
+  --duration <seconds>            Video duration in seconds (provider-specific)
 
 Env:
   GEMINI_API_KEY (or GOOGLE_API_KEY)
@@ -37,6 +47,10 @@ Env:
 Examples:
   npx climage "make image of kitten"
   npx climage "A cat in a tree" --provider xai --n 4
+  npx climage "a cinematic shot of a corgi running" --provider fal --type video
+  npx climage "make the cat orange" --provider xai --input photo.jpg
+  npx climage "the cat walks away" --video --provider google --start-frame cat.png
+  npx climage "morphing transition" --video --provider fal --start-frame a.png --end-frame b.png
 `);
   process.exit(code);
 }
@@ -45,59 +59,119 @@ function parseArgs(argv: string[]): { prompt: string; opts: GenerateOptions; jso
   const args = [...argv];
   const opts: GenerateOptions = {};
   let json = false;
+  const promptParts: string[] = [];
+  const inputImages: string[] = [];
 
-  const take = (name: string): string => {
-    const v = args.shift();
-    if (!v) throw new Error(`Missing value for ${name}`);
-    return v;
-  };
+  // Options that take a value
+  const optionsWithValue = new Set([
+    '--provider',
+    '--model',
+    '--n',
+    '--type',
+    '--format',
+    '--out',
+    '--outDir',
+    '--name',
+    '--aspect-ratio',
+    '--input',
+    '--start-frame',
+    '--end-frame',
+    '--duration',
+  ]);
 
-  while (args.length) {
-    const a = args[0];
-    if (!a) break;
-    if (a === '-h' || a === '--help') usage(0);
-    if (a === '--json') {
-      json = true;
-      args.shift();
+  let i = 0;
+  while (i < args.length) {
+    const a = args[i];
+    if (!a) {
+      i++;
       continue;
     }
-    if (!a.startsWith('-')) break;
 
-    args.shift();
-    switch (a) {
-      case '--provider':
-        opts.provider = take(a) as ProviderId;
-        break;
-      case '--model':
-        opts.model = take(a);
-        break;
-      case '--n':
-        opts.n = Number(take(a));
-        break;
-      case '--format':
-        opts.format = take(a) as any;
-        break;
-      case '--out':
-        opts.out = take(a);
-        break;
-      case '--outDir':
-        opts.outDir = take(a);
-        break;
-      case '--name':
-        opts.name = take(a);
-        break;
-      case '--aspect-ratio':
-        opts.aspectRatio = take(a);
-        break;
-      case '--verbose':
-        opts.verbose = true;
-        break;
-      default:
-        throw new Error(`Unknown option: ${a}`);
+    // Help
+    if (a === '-h' || a === '--help') usage(0);
+
+    // Boolean flags
+    if (a === '--json') {
+      json = true;
+      i++;
+      continue;
     }
+    if (a === '--video') {
+      opts.kind = 'video';
+      i++;
+      continue;
+    }
+    if (a === '--verbose') {
+      opts.verbose = true;
+      i++;
+      continue;
+    }
+
+    // Options with values
+    if (optionsWithValue.has(a)) {
+      const v = args[i + 1];
+      if (!v || v.startsWith('-')) throw new Error(`Missing value for ${a}`);
+      switch (a) {
+        case '--provider':
+          opts.provider = v as ProviderId;
+          break;
+        case '--model':
+          opts.model = v;
+          break;
+        case '--n':
+          opts.n = Number(v);
+          break;
+        case '--type':
+          opts.kind = v as any;
+          break;
+        case '--format':
+          opts.format = v as any;
+          break;
+        case '--out':
+          opts.out = v;
+          break;
+        case '--outDir':
+          opts.outDir = v;
+          break;
+        case '--name':
+          opts.name = v;
+          break;
+        case '--aspect-ratio':
+          opts.aspectRatio = v;
+          break;
+        case '--input':
+          inputImages.push(v);
+          break;
+        case '--start-frame':
+          opts.startFrame = v;
+          break;
+        case '--end-frame':
+          opts.endFrame = v;
+          break;
+        case '--duration':
+          opts.duration = Number(v);
+          break;
+      }
+      i += 2;
+      continue;
+    }
+
+    // Unknown option
+    if (a.startsWith('-')) {
+      throw new Error(`Unknown option: ${a}`);
+    }
+
+    // Non-option = prompt part
+    promptParts.push(a);
+    i++;
   }
 
-  const prompt = args.join(' ').trim();
+  // Add collected input images to opts
+  if (inputImages.length) {
+    opts.inputImages = inputImages;
+  }
+
+  const prompt = promptParts.join(' ').trim();
   if (!prompt) throw new Error('Missing prompt');
 
   return { prompt, opts, json };
@@ -106,15 +180,15 @@ function parseArgs(argv: string[]): { prompt: string; opts: GenerateOptions; jso
 async function main() {
   try {
     const { prompt, opts, json } = parseArgs(process.argv.slice(2));
-    const images = await generateImage(prompt, opts);
+    const items = await generateMedia(prompt, opts);
 
     if (json) {
-      process.stdout.write(JSON.stringify({ images }, null, 2) + '\n');
+      process.stdout.write(JSON.stringify(toJsonResult(items), null, 2) + '\n');
       return;
     }
 
-    for (const img of images) {
-      process.stdout.write(img.filePath + '\n');
+    for (const item of items) {
+      process.stdout.write(item.filePath + '\n');
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
