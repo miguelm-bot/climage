@@ -60,12 +60,12 @@ async function sleep(ms: number) {
   await new Promise((r) => setTimeout(r, ms));
 }
 
+/**
+ * Generate images using xAI's /v1/images/generations endpoint (text-to-image).
+ */
 async function generateXaiImages(req: GenerateRequest, apiKey: string) {
-  // Use grok-imagine-image for editing (when image_url is provided)
-  const hasInputImage = req.inputImages?.length;
-  const defaultModel = hasInputImage ? 'grok-imagine-image' : 'grok-2-image';
-  const model = req.model ?? defaultModel;
-  log('Starting image generation, model:', model, 'n:', req.n, 'hasInputImage:', !!hasInputImage);
+  const model = req.model ?? 'grok-imagine-image';
+  log('Starting image generation, model:', model, 'n:', req.n);
 
   const body: Record<string, unknown> = {
     model,
@@ -75,10 +75,8 @@ async function generateXaiImages(req: GenerateRequest, apiKey: string) {
     ...(req.aspectRatio ? { aspect_ratio: req.aspectRatio } : {}),
     // Use URL format to download + save.
     response_format: 'url',
-    // Add image_url for editing if input image provided
-    ...(hasInputImage && req.inputImages?.[0] ? { image_url: req.inputImages[0] } : {}),
   };
-  log('Request body:', JSON.stringify({ ...body, image_url: body.image_url ? '...' : undefined }));
+  log('Request body:', JSON.stringify(body));
 
   log('Calling xAI images/generations...');
   const startTime = Date.now();
@@ -105,6 +103,62 @@ async function generateXaiImages(req: GenerateRequest, apiKey: string) {
 
   if (!json.data?.length) throw new Error('xAI returned no images');
 
+  return processXaiImageResponse(json, model);
+}
+
+/**
+ * Edit images using xAI's /v1/images/edits endpoint (image-to-image).
+ * Uses JSON format with image_url (data URI or URL).
+ */
+async function editXaiImages(req: GenerateRequest, apiKey: string) {
+  const model = req.model ?? 'grok-imagine-image';
+  const inputImage = req.inputImages?.[0];
+  if (!inputImage) throw new Error('No input image provided for editing');
+
+  log('Starting image editing, model:', model, 'n:', req.n);
+
+  const body: Record<string, unknown> = {
+    model,
+    prompt: req.prompt,
+    n: req.n,
+    image: { url: inputImage }, // Object with url field containing data URI or URL
+    response_format: 'url',
+    ...(req.aspectRatio ? { aspect_ratio: req.aspectRatio } : {}),
+  };
+  log('Request body:', JSON.stringify({ ...body, image: { url: '...(data uri)...' } }));
+
+  log('Calling xAI images/edits...');
+  const startTime = Date.now();
+
+  const res = await fetch(`${XAI_API_BASE}/images/edits`, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${apiKey}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  log(`API responded in ${Date.now() - startTime}ms, status: ${res.status}`);
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    log('Error response:', txt.slice(0, 1000));
+    throw new Error(`xAI edits failed (${res.status}): ${txt.slice(0, 500)}`);
+  }
+
+  const json = (await res.json()) as XaiImagesResponse;
+  log('Response data count:', json.data?.length);
+
+  if (!json.data?.length) throw new Error('xAI returned no images');
+
+  return processXaiImageResponse(json, model);
+}
+
+/**
+ * Process xAI image response and download images.
+ */
+async function processXaiImageResponse(json: XaiImagesResponse, model: string) {
   const results = [] as Array<{
     kind: 'image';
     provider: 'xai';
@@ -160,18 +214,24 @@ async function generateXaiVideo(req: GenerateRequest, apiKey: string) {
   );
 
   // xAI is async: create request_id, then poll /v1/videos/{request_id}
+  // Note: xAI video API uses image_url as a string (data URI or URL), not an object
   const createBody: Record<string, unknown> = {
     prompt: req.prompt,
     model,
     ...(req.aspectRatio ? { aspect_ratio: req.aspectRatio } : {}),
-    // Add image_url for image-to-video
+    // Add image_url for image-to-video (data URI or URL string)
     ...(imageUrl ? { image_url: imageUrl } : {}),
     // Add duration (xAI supports 1-15 seconds)
     ...(req.duration !== undefined ? { duration: req.duration } : {}),
   };
   log(
     'Request body:',
-    JSON.stringify({ ...createBody, image_url: createBody.image_url ? '...' : undefined })
+    JSON.stringify({
+      ...createBody,
+      image_url: createBody.image_url
+        ? `...(${String(createBody.image_url).length} chars)`
+        : undefined,
+    })
   );
 
   log('Calling xAI videos/generations...');
@@ -294,6 +354,13 @@ export const xaiProvider: Provider = {
     log('Provider initialized, kind:', req.kind);
 
     if (req.kind === 'video') return generateXaiVideo(req, apiKey);
+
+    // Use edit endpoint if input images provided, otherwise generation
+    const hasInputImages = req.inputImages && req.inputImages.length > 0;
+    if (hasInputImages) {
+      log('Input images detected, using edit endpoint');
+      return editXaiImages(req, apiKey);
+    }
     return generateXaiImages(req, apiKey);
   },
 };

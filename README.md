@@ -153,14 +153,14 @@ npx climage "replace the sky" --provider openai --input photo.png --input mask.p
 Generate videos from images:
 
 ```bash
-# Basic image-to-video with xAI
-npx climage "the cat walks away" --video --provider xai --start-frame cat.png
-
 # Image-to-video with Google Veo
 npx climage "the scene comes to life" --video --provider google --start-frame scene.png --duration 8
 
 # Image-to-video with fal.ai
 npx climage "dramatic camera zoom" --video --provider fal --start-frame photo.jpg
+
+# Image-to-video with xAI
+npx climage "animate this scene" --video --provider xai --start-frame cat.png
 ```
 
 ## Video Interpolation

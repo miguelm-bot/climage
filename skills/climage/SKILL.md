@@ -86,6 +86,10 @@ npx climage "a cinematic shot of a corgi running" --type video
 --outDir <dir>                             Output directory (default: .)
 --name <text>                              Base filename
 --aspect-ratio <w:h>                       Aspect ratio (provider-specific)
+--input <path>                             Input image for editing (repeatable)
+--start-frame <path>                       Start frame image for video
+--end-frame <path>                         End frame image for video interpolation
+--duration <seconds>                       Video duration in seconds
 --json                                     JSON output
 ```
 
@@ -99,13 +103,10 @@ npx climage "sunset over mountains"
 npx climage "sunset over mountains" --model nano-banana
 
 # Google video (Veo)
-GEMINI_API_KEY=... npx climage "a neon hologram of a cat driving at top speed" --type video
+npx climage "a neon hologram of a cat driving" --video
 
 # xAI video
-XAI_API_KEY=... npx climage "a cat playing with a ball" --provider xai --type video
-
-# OpenAI GPT Image
-OPENAI_API_KEY=... npx climage "cyberpunk cityscape" --provider openai
+npx climage "a cat playing with a ball" --provider xai --video
 
 # Multiple outputs with custom aspect ratio
 npx climage "wide landscape" --n 4 --aspect-ratio 16:9 --outDir ./out
@@ -114,11 +115,65 @@ npx climage "wide landscape" --n 4 --aspect-ratio 16:9 --outDir ./out
 npx climage "logo design" --json
 ```
 
+## Image Editing
+
+Edit existing images with a text prompt:
+
+```bash
+# Edit with Google
+npx climage "add a sunset background" --provider google --input photo.png
+
+# Edit with xAI
+npx climage "make the cat blue" --provider xai --input cat.jpg
+
+# Edit with OpenAI (supports optional mask as second input)
+npx climage "replace the sky" --provider openai --input photo.png --input mask.png
+```
+
+## Image-to-Video
+
+Generate videos from images:
+
+```bash
+# Google Veo with start frame
+npx climage "the scene comes to life" --video --provider google --start-frame scene.png --duration 8
+
+# fal.ai with start frame
+npx climage "camera slowly zooms in" --video --provider fal --start-frame photo.jpg
+
+# xAI with start frame
+npx climage "animate this image" --video --provider xai --start-frame cat.png --duration 5
+```
+
+## Video Interpolation
+
+Create smooth transitions between two images (fal.ai and Google Veo):
+
+```bash
+# fal.ai Vidu interpolation
+npx climage "smooth transition" --video --provider fal --start-frame before.png --end-frame after.png
+
+# Google Veo interpolation
+npx climage "morph between frames" --video --provider google --start-frame a.png --end-frame b.png
+```
+
+## Provider Capabilities
+
+| Feature             | Google | xAI | fal.ai | OpenAI |
+| ------------------- | ------ | --- | ------ | ------ |
+| Image Generation    | Yes    | Yes | Yes    | Yes    |
+| Image Editing       | Yes    | Yes | Yes    | Yes    |
+| Video Generation    | Yes    | Yes | Yes    | No     |
+| Image-to-Video      | Yes    | Yes | Yes    | No     |
+| Video Interpolation | Yes    | No  | Yes    | No     |
+| Max Input Images    | 3      | 1   | 7      | 2      |
+
 ## Library API
 
 ```ts
 import { generateImage, generateVideo } from 'climage';
 
+// Basic image generation
 const images = await generateImage('a futuristic robot', {
   provider: 'google',
   model: 'nano-banana-pro',
@@ -126,10 +181,30 @@ const images = await generateImage('a futuristic robot', {
   format: 'webp',
 });
 
+// Image editing
+const edited = await generateImage('make the sky purple', {
+  provider: 'google',
+  inputImages: ['./photo.png'],
+});
+
+// Video generation
 const videos = await generateVideo('a cinematic corgi running', {
   provider: 'google',
-  model: 'veo-3.1-generate-preview',
   n: 1,
+});
+
+// Image-to-video
+const animated = await generateVideo('the scene comes to life', {
+  provider: 'fal',
+  startFrame: './scene.png',
+  duration: 5,
+});
+
+// Video interpolation
+const interpolated = await generateVideo('smooth transition', {
+  provider: 'fal',
+  startFrame: './before.png',
+  endFrame: './after.png',
 });
 
 for (const item of [...images, ...videos]) {
