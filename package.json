@@ -24,7 +24,13 @@
     "build": "tsup",
     "dev": "node --enable-source-maps dist/cli.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "node -e \"console.log('no lint configured')\""
+    "lint": "prettier --check .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{js,ts,json,md}": "prettier --write"
   },
   "dependencies": {
     "@fal-ai/client": "^1.8.4",
@@ -33,6 +39,9 @@
   },
   "devDependencies": {
     "@types/node": "^24.1.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
+    "prettier": "^3.8.1",
     "tsup": "^8.5.0",
     "typescript": "^5.9.2"
   }

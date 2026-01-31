@@ -13,6 +13,7 @@ npx climage "make image of kitten"
 ### xAI (grok-imagine-image)
 
 Set one of:
+
 - `XAI_API_KEY` (preferred)
 - `XAI_TOKEN`
 - `GROK_API_KEY`
@@ -26,6 +27,7 @@ XAI_API_KEY=... npx climage "A cat in a tree" --provider xai
 ### Google (Imagen)
 
 Set one of:
+
 - `GEMINI_API_KEY` (preferred)
 - `GOOGLE_API_KEY`
 
@@ -38,6 +40,7 @@ GEMINI_API_KEY=... npx climage "A cat in a tree" --provider google --model image
 ### fal.ai
 
 Set one of:
+
 - `FAL_KEY` (preferred by fal docs)
 - `FAL_API_KEY` (also common)
 
@@ -62,14 +65,14 @@ FAL_KEY=... npx climage "A cat in a tree" --provider fal
 ## Library API
 
 ```ts
-import { generateImage } from 'climage'
+import { generateImage } from 'climage';
 
 const images = await generateImage('make image of kitten', {
   provider: 'xai',
   n: 2,
-})
+});
 
-console.log(images.map((i) => i.filePath))
+console.log(images.map((i) => i.filePath));
 ```
 
 ## Notes

@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: ["master", "main"]
+    branches: ['master', 'main']
   pull_request:
 
 permissions:
@@ -26,24 +26,47 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           cache: npm
-          cache-dependency-path: climage/package-lock.json
 
       - name: Install
-        working-directory: climage
         run: npm ci
 
       - name: Lint
-        working-directory: climage
-        run: npm run lint --if-present
+        run: npm run lint
 
       - name: Build
-        working-directory: climage
         run: npm run build
 
       - name: Typecheck
-        working-directory: climage
-        run: npm run typecheck --if-present
+        run: npm run typecheck
 
       - name: Pack (ensures package files resolve)
-        working-directory: climage
         run: npm pack --silent
+
+  publish:
+    name: Publish to npm
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Publish
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
