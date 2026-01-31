@@ -10,9 +10,11 @@ npx climage "make image of kitten"
 
 ## Providers
 
-### Google (Nano Banana / Imagen)
+### Google (Nano Banana / Imagen / Veo)
 
 **Default provider** with Gemini's native image generation (Nano Banana).
+
+Also supports video generation via **Veo**.
 
 Set one of:
 
@@ -68,6 +70,8 @@ OPENAI_API_KEY=... npx climage "A cat in a tree" --provider openai --model gpt-i
 ```
 
 ### xAI (Grok Imagine)
+
+Also supports video generation.
 
 Set one of:
 
