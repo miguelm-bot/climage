@@ -85,13 +85,27 @@ npx climage "a cinematic shot of a corgi running" --type video
 --out <path>                               Output file (only when n=1)
 --outDir <dir>                             Output directory (default: .)
 --name <text>                              Base filename
---aspect-ratio <w:h>                       Aspect ratio (provider-specific)
---input <path>                             Input image for editing (repeatable)
+--aspect-ratio <w:h>                       Aspect ratio (provider-specific; see notes below)
+--input <path>                             Input image for editing/reference (repeatable; provider-specific limits apply)
 --start-frame <path>                       Start frame image for video
 --end-frame <path>                         End frame image for video interpolation
 --duration <seconds>                       Video duration in seconds
 --json                                     JSON output
 ```
+
+### Aspect ratio support (by provider)
+
+- **Google (Imagen/Veo):** `1:1`, `4:3`, `3:4`, `16:9`, `9:16`
+- **OpenAI (gpt-image-_/dall-e-_):** limited set (depends on model). Custom ratios are not supported.
+- **xAI:** accepts `aspect_ratio: "w:h"` (docs show `4:3`).
+- **fal.ai:** provider/model-specific; arbitrary `w:h` is passed through for models that accept it.
+
+### Multiple input images
+
+- **Google (Veo 3.1):** up to 3 reference images via repeated `--input`.
+- **fal.ai:** up to 7 reference images via repeated `--input` (model-dependent).
+- **OpenAI:** uses first `--input` as image and second (optional) as mask.
+- **xAI:** currently uses only the first `--input` for edits / image-to-video.
 
 ## Examples
 

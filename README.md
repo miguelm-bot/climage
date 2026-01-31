@@ -124,11 +124,18 @@ FAL_KEY=... npx climage "A cat in a tree" --provider fal
 - `--outDir <dir>` (default: current directory)
 - `--name <text>` base name override
 - `--aspect-ratio <w:h>` (e.g. `16:9`, `4:3`, `1:1`)
+
+### Aspect ratio support (by provider)
+
+- **Google (Imagen/Veo):** `1:1`, `4:3`, `3:4`, `16:9`, `9:16`
+- **OpenAI (gpt-image-_/dall-e-_):** limited set (depends on model). Custom ratios are **not** supported.
+- **xAI:** accepts `aspect_ratio: "w:h"` (docs show `4:3`).
+- **fal.ai:** provider/model-specific; common ratios are supported and arbitrary `w:h` is passed through for models that accept it.
 - `--json`
 
 ### Input Images
 
-- `--input <path>` Input image for editing or reference (can be used multiple times)
+- `--input <path>` Input image for editing or reference (can be used multiple times; provider-specific limits apply)
 - `--start-frame <path>` First frame image for video generation
 - `--end-frame <path>` Last frame image for video interpolation
 - `--duration <seconds>` Video duration in seconds
@@ -138,7 +145,7 @@ FAL_KEY=... npx climage "A cat in a tree" --provider fal
 Edit existing images by providing an input image:
 
 ```bash
-# Edit with xAI
+# Edit with xAI (currently uses only the first input image)
 npx climage "make the cat orange" --provider xai --input photo.jpg
 
 # Edit with Google Gemini

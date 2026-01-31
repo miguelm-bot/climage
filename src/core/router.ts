@@ -128,6 +128,33 @@ function validateRequestForProvider(req: GenerateRequest, provider: Provider): v
     );
   }
 
+  // Validate aspect ratio (when provider declares supported ratios)
+  if (req.aspectRatio) {
+    const ar = req.aspectRatio.trim();
+
+    // Providers that explicitly support custom ratios may also accept provider-specific enums.
+    if (caps.supportsCustomAspectRatio === true) return;
+
+    // If provider has an allowlist, validate against it.
+    if (Array.isArray(caps.supportedAspectRatios) && caps.supportedAspectRatios.length) {
+      const normalized = ar.replace(/\s+/g, '');
+      const ok = caps.supportedAspectRatios.includes(normalized);
+      if (!ok) {
+        throw new Error(
+          `Provider ${provider.id} does not support aspect ratio "${normalized}". ` +
+            `Supported: ${caps.supportedAspectRatios.join(', ')}`
+        );
+      }
+      return;
+    }
+
+    // Otherwise enforce basic w:h format to avoid passing junk.
+    const looksLikeRatio = /^\d+\s*:\s*\d+$/.test(ar);
+    if (!looksLikeRatio) {
+      throw new Error(`Invalid aspect ratio: "${req.aspectRatio}" (expected format: w:h)`);
+    }
+  }
+
   // Validate video interpolation (start + end frame)
   if (req.endFrame && !caps.supportsVideoInterpolation) {
     throw new Error(
