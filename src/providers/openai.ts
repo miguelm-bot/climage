@@ -29,7 +29,7 @@ function mapAspectRatioToSize(aspectRatio?: string, model?: string): string | un
   if (!aspectRatio) return undefined;
 
   const ar = aspectRatio.trim();
-  // gpt-image-1 supports: 1024x1024, 1536x1024 (landscape), 1024x1536 (portrait), auto
+  // gpt-image-1.5/1/1-mini supports: 1024x1024, 1536x1024 (landscape), 1024x1536 (portrait), auto
   // dall-e-3 supports: 1024x1024, 1792x1024 (landscape), 1024x1792 (portrait)
   // dall-e-2 supports: 256x256, 512x512, 1024x1024
 
@@ -56,8 +56,8 @@ export const openaiProvider: Provider = {
     const apiKey = getOpenAIApiKey(env);
     if (!apiKey) throw new Error('Missing OpenAI API key. Set OPENAI_API_KEY.');
 
-    // Default to gpt-image-1 (latest), can be overridden to dall-e-3 or dall-e-2
-    const model = req.model ?? 'gpt-image-1';
+    // Default to gpt-image-1.5 (latest), can be overridden to gpt-image-1, gpt-image-1-mini, dall-e-3 or dall-e-2
+    const model = req.model ?? 'gpt-image-1.5';
 
     const size = mapAspectRatioToSize(req.aspectRatio, model);
 

@@ -28,7 +28,7 @@ async function downloadBytes(
 
 export const xaiProvider: Provider = {
   id: 'xai',
-  displayName: 'xAI (grok-imagine-image)',
+  displayName: 'xAI (Grok Imagine)',
   isAvailable(env) {
     return Boolean(getXaiApiKey(env));
   },

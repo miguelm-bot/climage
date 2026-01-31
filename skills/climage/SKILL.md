@@ -5,7 +5,7 @@ description: Generate images from the terminal or code using climage. Use when t
 
 # climage
 
-Generate images via multiple AI providers (Google Imagen, xAI Grok, fal.ai, OpenAI).
+Generate images via multiple AI providers (Google Nano Banana/Imagen, OpenAI GPT Image, xAI Grok, fal.ai).
 
 ## Quick Start
 
@@ -13,21 +13,53 @@ Generate images via multiple AI providers (Google Imagen, xAI Grok, fal.ai, Open
 npx climage "a cat wearing a top hat"
 ```
 
-## Providers & API Keys
+## Providers & Models
 
-| Provider      | Env Variable     | Model Example             |
-| ------------- | ---------------- | ------------------------- |
-| Google Imagen | `GEMINI_API_KEY` | `imagen-4.0-generate-001` |
-| xAI Grok      | `XAI_API_KEY`    | `grok-imagine-image`      |
-| fal.ai        | `FAL_KEY`        | (default)                 |
-| OpenAI        | `OPENAI_API_KEY` | `gpt-image-1`             |
+### Google (Default Provider)
 
-Auto-detection picks the first available provider.
+| Model                           | Alias             | Description                                          |
+| ------------------------------- | ----------------- | ---------------------------------------------------- |
+| `gemini-3-pro-image-preview`    | `nano-banana-pro` | **Default.** Best quality, 4K support, thinking mode |
+| `gemini-2.5-flash-image`        | `nano-banana`     | Fast, efficient for high-volume                      |
+| `imagen-4.0-generate-001`       | -                 | Imagen 4 Standard                                    |
+| `imagen-4.0-ultra-generate-001` | -                 | Imagen 4 Ultra                                       |
+| `imagen-4.0-fast-generate-001`  | -                 | Imagen 4 Fast                                        |
+
+### OpenAI
+
+| Model              | Description                                     |
+| ------------------ | ----------------------------------------------- |
+| `gpt-image-1.5`    | **Default.** Latest, best instruction following |
+| `gpt-image-1`      | Previous generation                             |
+| `gpt-image-1-mini` | Cost-effective                                  |
+
+### xAI
+
+| Model                | Description                          |
+| -------------------- | ------------------------------------ |
+| `grok-imagine-image` | **Default.** Grok's image generation |
+
+### fal.ai
+
+| Model                 | Description               |
+| --------------------- | ------------------------- |
+| `fal-ai/flux/dev`     | **Default.** Flux dev     |
+| `fal-ai/flux/pro`     | Flux pro (higher quality) |
+| `fal-ai/flux-realism` | Photorealistic            |
+
+## API Keys
+
+| Provider | Env Variable     |
+| -------- | ---------------- |
+| Google   | `GEMINI_API_KEY` |
+| OpenAI   | `OPENAI_API_KEY` |
+| xAI      | `XAI_API_KEY`    |
+| fal.ai   | `FAL_KEY`        |
 
 ## CLI Options
 
 ```
---provider <auto|google|xai|fal|openai>  Provider selection
+--provider <auto|google|openai|xai|fal>  Provider selection
 --model <id>                             Model id (provider-specific)
 --n <1..10>                              Number of images
 --format <png|jpg|webp>                  Output format (default: png)
@@ -41,14 +73,17 @@ Auto-detection picks the first available provider.
 ## Examples
 
 ```bash
-# Generate with specific provider
-npx climage "sunset over mountains" --provider google
+# Default (Google Nano Banana Pro)
+npx climage "sunset over mountains"
 
-# Multiple images
-npx climage "cyberpunk cityscape" --n 4 --outDir ./images
+# Fast generation with Nano Banana
+npx climage "sunset over mountains" --model nano-banana
 
-# Custom aspect ratio
-npx climage "wide landscape" --aspect-ratio 16:9 --provider xai
+# OpenAI GPT Image
+npx climage "cyberpunk cityscape" --provider openai
+
+# Multiple images with custom aspect ratio
+npx climage "wide landscape" --n 4 --aspect-ratio 16:9 --outDir ./images
 
 # JSON output for scripting
 npx climage "logo design" --json
@@ -60,7 +95,8 @@ npx climage "logo design" --json
 import { generateImage } from 'climage';
 
 const images = await generateImage('a futuristic robot', {
-  provider: 'openai',
+  provider: 'google',
+  model: 'nano-banana-pro',
   n: 2,
   format: 'webp',
 });
