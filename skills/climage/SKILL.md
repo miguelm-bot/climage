@@ -1,21 +1,26 @@
 ---
 name: climage
-description: Generate images from the terminal or code using climage. Use when the user asks to generate, create, or make images, or mentions image generation, AI images, or climage.
+description: Generate images or videos from the terminal or code using climage. Use when the user asks to generate, create, or make images/videos, or mentions media generation, AI images, AI video, or climage.
 ---
 
 # climage
 
-Generate images via multiple AI providers (Google Nano Banana/Imagen, OpenAI GPT Image, xAI Grok, fal.ai).
+Generate images and videos via multiple AI providers (Google Nano Banana/Imagen/Veo, OpenAI GPT Image, xAI Grok, fal.ai).
 
 ## Quick Start
 
 ```bash
 npx climage "a cat wearing a top hat"
+
+# video
+npx climage "a cinematic shot of a corgi running" --type video
 ```
 
 ## Providers & Models
 
 ### Google (Default Provider)
+
+**Images**
 
 | Model                           | Alias             | Description                                          |
 | ------------------------------- | ----------------- | ---------------------------------------------------- |
@@ -25,7 +30,16 @@ npx climage "a cat wearing a top hat"
 | `imagen-4.0-ultra-generate-001` | -                 | Imagen 4 Ultra                                       |
 | `imagen-4.0-fast-generate-001`  | -                 | Imagen 4 Fast                                        |
 
+**Video (Veo)**
+
+| Model                      | Alias     | Description                  |
+| -------------------------- | --------- | ---------------------------- |
+| `veo-3.1-generate-preview` | `veo3.1`  | **Default.** Preview channel |
+| `veo-3.1-generate-preview` | `veo-3.1` | Preview channel alias        |
+
 ### OpenAI
+
+(Image only)
 
 | Model              | Description                                     |
 | ------------------ | ----------------------------------------------- |
@@ -35,11 +49,14 @@ npx climage "a cat wearing a top hat"
 
 ### xAI
 
-| Model                | Description                          |
-| -------------------- | ------------------------------------ |
-| `grok-imagine-image` | **Default.** Grok's image generation |
+| Model                | Kind  | Description                          |
+| -------------------- | ----- | ------------------------------------ |
+| `grok-imagine-image` | image | **Default.** Grok's image generation |
+| `grok-imagine-video` | video | **Default.** Grok's video generation |
 
 ### fal.ai
+
+(Depends on model; many support image and/or video)
 
 | Model                 | Description               |
 | --------------------- | ------------------------- |
@@ -59,15 +76,17 @@ npx climage "a cat wearing a top hat"
 ## CLI Options
 
 ```
---provider <auto|google|openai|xai|fal>  Provider selection
---model <id>                             Model id (provider-specific)
---n <1..10>                              Number of images
---format <png|jpg|webp>                  Output format (default: png)
---out <path>                             Output file (single image only)
---outDir <dir>                           Output directory (default: .)
---name <text>                            Base filename
---aspect-ratio <w:h>                     Aspect ratio (e.g. 4:3, 16:9)
---json                                   JSON output
+--provider <auto|google|openai|xai|fal>     Provider selection
+--model <id>                               Model id (provider-specific)
+--n <1..10>                                Number of outputs
+--type <image|video>                       Output type (default: image)
+--video                                    Shortcut for: --type video
+--format <png|jpg|webp|mp4|webm|gif>       Output format (default: png for image, mp4 for video)
+--out <path>                               Output file (only when n=1)
+--outDir <dir>                             Output directory (default: .)
+--name <text>                              Base filename
+--aspect-ratio <w:h>                       Aspect ratio (provider-specific)
+--json                                     JSON output
 ```
 
 ## Examples
@@ -79,11 +98,17 @@ npx climage "sunset over mountains"
 # Fast generation with Nano Banana
 npx climage "sunset over mountains" --model nano-banana
 
-# OpenAI GPT Image
-npx climage "cyberpunk cityscape" --provider openai
+# Google video (Veo)
+GEMINI_API_KEY=... npx climage "a neon hologram of a cat driving at top speed" --type video
 
-# Multiple images with custom aspect ratio
-npx climage "wide landscape" --n 4 --aspect-ratio 16:9 --outDir ./images
+# xAI video
+XAI_API_KEY=... npx climage "a cat playing with a ball" --provider xai --type video
+
+# OpenAI GPT Image
+OPENAI_API_KEY=... npx climage "cyberpunk cityscape" --provider openai
+
+# Multiple outputs with custom aspect ratio
+npx climage "wide landscape" --n 4 --aspect-ratio 16:9 --outDir ./out
 
 # JSON output for scripting
 npx climage "logo design" --json
@@ -92,7 +117,7 @@ npx climage "logo design" --json
 ## Library API
 
 ```ts
-import { generateImage } from 'climage';
+import { generateImage, generateVideo } from 'climage';
 
 const images = await generateImage('a futuristic robot', {
   provider: 'google',
@@ -101,13 +126,19 @@ const images = await generateImage('a futuristic robot', {
   format: 'webp',
 });
 
-for (const img of images) {
-  console.log(img.filePath);
+const videos = await generateVideo('a cinematic corgi running', {
+  provider: 'google',
+  model: 'veo-3.1-generate-preview',
+  n: 1,
+});
+
+for (const item of [...images, ...videos]) {
+  console.log(item.filePath);
 }
 ```
 
 ## Output
 
 - CLI prints file paths to stdout (one per line)
-- With `--json`: `{ "images": [{ "filePath": "...", ... }] }`
+- With `--json`: `{ "images": [...], "videos": [...] }` (keys only present when applicable)
 - Files saved to current directory or `--outDir`
