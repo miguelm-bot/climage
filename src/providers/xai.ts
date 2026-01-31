@@ -16,7 +16,9 @@ type XaiImagesResponse = {
   data: XaiImage[];
 };
 
-async function downloadBytes(url: string): Promise<{ bytes: Uint8Array; mimeType?: string }> {
+async function downloadBytes(
+  url: string
+): Promise<{ bytes: Uint8Array; mimeType: string | undefined }> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`xAI image download failed (${res.status})`);
   const ab = await res.arrayBuffer();
@@ -73,9 +75,17 @@ export const xaiProvider: Provider = {
 
     for (let i = 0; i < json.data.length; i++) {
       const img = json.data[i];
+      if (!img) continue;
       if (img.url) {
         const { bytes, mimeType } = await downloadBytes(img.url);
-        results.push({ provider: 'xai', model, index: i, url: img.url, bytes, mimeType });
+        results.push({
+          provider: 'xai',
+          model,
+          index: i,
+          url: img.url,
+          bytes,
+          ...(mimeType !== undefined ? { mimeType } : {}),
+        });
         continue;
       }
       if (img.b64_json) {

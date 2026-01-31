@@ -16,7 +16,9 @@ type FalResult = {
   images?: FalImage[];
 };
 
-async function downloadBytes(url: string): Promise<{ bytes: Uint8Array; mimeType?: string }> {
+async function downloadBytes(
+  url: string
+): Promise<{ bytes: Uint8Array; mimeType: string | undefined }> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`fal image download failed (${res.status})`);
   const ab = await res.arrayBuffer();
@@ -77,13 +79,14 @@ export const falProvider: Provider = {
       const img = images[i];
       if (!img?.url) continue;
       const { bytes, mimeType } = await downloadBytes(img.url);
+      const finalMimeType = img.content_type ?? mimeType;
       out.push({
         provider: 'fal',
         model,
         index: i,
         url: img.url,
         bytes,
-        mimeType: img.content_type ?? mimeType,
+        ...(finalMimeType !== undefined ? { mimeType: finalMimeType } : {}),
       });
     }
 
