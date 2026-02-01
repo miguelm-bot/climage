@@ -372,6 +372,9 @@ async function generateWithGemini(
         contents: buildContents() as any,
         config: {
           responseModalities: ['IMAGE'],
+          // Gemini native image generation (Nano Banana) supports aspect ratio via imageConfig.
+          // Note: when editing from an input image, the model may still bias toward the input image's aspect.
+          ...(req.aspectRatio ? { imageConfig: { aspectRatio: req.aspectRatio } } : {}),
         },
       });
 
