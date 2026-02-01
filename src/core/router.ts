@@ -128,6 +128,32 @@ function validateRequestForProvider(req: GenerateRequest, provider: Provider): v
     );
   }
 
+  // Validate aspect ratio
+  if (req.aspectRatio) {
+    const normalized = req.aspectRatio.trim().replace(/\s+/g, '');
+
+    // Always enforce a basic w:h shape to avoid passing junk downstream.
+    const looksLikeRatio = /^\d+:\d+$/.test(normalized);
+    if (!looksLikeRatio) {
+      throw new Error(`Invalid aspect ratio: "${req.aspectRatio}" (expected format: w:h)`);
+    }
+
+    // If provider has an allowlist and does NOT support arbitrary custom ratios, validate against it.
+    if (
+      caps.supportsCustomAspectRatio !== true &&
+      Array.isArray(caps.supportedAspectRatios) &&
+      caps.supportedAspectRatios.length
+    ) {
+      const ok = caps.supportedAspectRatios.includes(normalized);
+      if (!ok) {
+        throw new Error(
+          `Provider ${provider.id} does not support aspect ratio "${normalized}". ` +
+            `Supported: ${caps.supportedAspectRatios.join(', ')}`
+        );
+      }
+    }
+  }
+
   // Validate video interpolation (start + end frame)
   if (req.endFrame && !caps.supportsVideoInterpolation) {
     throw new Error(
@@ -200,7 +226,7 @@ export async function generateMedia(
   for (let i = 0; i < partials.length; i++) {
     const p: GeneratedMediaPartial | undefined = partials[i];
     if (!p) continue;
-    const filePath = makeOutputPath(req, i);
+    const filePath = makeOutputPath(req, i, p.mimeType);
     log(verbose, `Writing ${p.bytes.byteLength} bytes to: ${filePath}`);
     await writeMediaFile(filePath, p.bytes);
     items.push({ ...p, filePath });
