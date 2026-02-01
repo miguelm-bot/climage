@@ -69,12 +69,29 @@ async function downloadBytes(url: string): Promise<{ bytes: Uint8Array; mimeType
   return ct ? { bytes: new Uint8Array(ab), mimeType: ct } : { bytes: new Uint8Array(ab) };
 }
 
+function supportedAspectRatiosForModel(model: string): string[] {
+  if (model.startsWith('gpt-image')) {
+    // These map onto the 3 supported sizes.
+    return ['1:1', '3:2', '4:3', '16:9', '2:3', '3:4', '9:16'];
+  }
+  if (model === 'dall-e-3') {
+    return ['1:1', '4:3', '16:9', '3:4', '9:16'];
+  }
+  if (model === 'dall-e-2') {
+    // DALL·E 2 only supports square sizes.
+    return ['1:1'];
+  }
+  // Unknown model: be conservative.
+  return ['1:1'];
+}
+
 // Map aspect ratios to OpenAI size parameters
 function mapAspectRatioToSize(aspectRatio?: string, model?: string): string | undefined {
   if (!aspectRatio) return undefined;
 
-  const ar = aspectRatio.trim();
-  // gpt-image-1.5/1/1-mini supports: 1024x1024, 1536x1024 (landscape), 1024x1536 (portrait), auto
+  const ar = aspectRatio.trim().replace(/\s+/g, '');
+
+  // gpt-image-* supports: 1024x1024, 1536x1024 (landscape), 1024x1536 (portrait)
   // dall-e-3 supports: 1024x1024, 1792x1024 (landscape), 1024x1792 (portrait)
   // dall-e-2 supports: 256x256, 512x512, 1024x1024
 
@@ -86,6 +103,8 @@ function mapAspectRatioToSize(aspectRatio?: string, model?: string): string | un
     if (ar === '1:1') return '1024x1024';
     if (ar === '16:9' || ar === '4:3') return '1792x1024';
     if (ar === '9:16' || ar === '3:4') return '1024x1792';
+  } else if (model === 'dall-e-2') {
+    if (ar === '1:1') return '1024x1024';
   }
 
   return undefined;
@@ -127,6 +146,12 @@ async function generateWithEdit(
 
   // Add size if specified
   const size = mapAspectRatioToSize(req.aspectRatio, model);
+  if (req.aspectRatio && !size) {
+    throw new Error(
+      `OpenAI model ${model} does not support aspect ratio "${req.aspectRatio}". ` +
+        `Supported: ${supportedAspectRatiosForModel(model).join(', ')}`
+    );
+  }
   if (size) formData.append('size', size);
 
   // Add the input image
@@ -233,6 +258,12 @@ export const openaiProvider: Provider = {
     }
 
     const size = mapAspectRatioToSize(req.aspectRatio, model);
+    if (req.aspectRatio && !size) {
+      throw new Error(
+        `OpenAI model ${model} does not support aspect ratio "${req.aspectRatio}". ` +
+          `Supported: ${supportedAspectRatiosForModel(model).join(', ')}`
+      );
+    }
 
     const body: Record<string, unknown> = {
       model,

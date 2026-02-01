@@ -74,10 +74,28 @@ export type GeneratedMediaPartial = Omit<GeneratedMedia, 'filePath'>;
 
 export type ProviderEnv = Record<string, string | undefined>;
 
-/** Provider capabilities for input images and video parameters. */
+/** Provider capabilities for input images, aspect ratio, and video parameters. */
 export interface ProviderCapabilities {
-  /** Maximum number of input images supported. */
+  /** Maximum number of input images supported.
+   *
+   * Notes:
+   * - Some providers only use the *first* image for certain operations.
+   * - Others treat multiple images as reference images.
+   */
   maxInputImages: number;
+
+  /** Supported aspect ratios as strings like "1:1", "16:9".
+   *
+   * If omitted, climage will not pre-validate (provider may still reject).
+   */
+  supportedAspectRatios?: string[];
+
+  /** Whether the provider supports arbitrary custom ratios like "7:5".
+   *
+   * If false/omitted and supportedAspectRatios is provided, climage will validate against the list.
+   */
+  supportsCustomAspectRatio?: boolean;
+
   /** Whether the provider supports video interpolation (start + end frames). */
   supportsVideoInterpolation: boolean;
   /** Video duration range [min, max] in seconds. Undefined if video not supported. */

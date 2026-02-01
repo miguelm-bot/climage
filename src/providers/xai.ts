@@ -115,6 +115,13 @@ async function editXaiImages(req: GenerateRequest, apiKey: string) {
   const inputImage = req.inputImages?.[0];
   if (!inputImage) throw new Error('No input image provided for editing');
 
+  if ((req.inputImages?.length ?? 0) > 1) {
+    throw new Error(
+      'xAI image editing supports only 1 input image (image_url). ' +
+        'Provide exactly one --input for xAI edits.'
+    );
+  }
+
   log('Starting image editing, model:', model, 'n:', req.n);
 
   const body: Record<string, unknown> = {
@@ -204,6 +211,12 @@ async function generateXaiVideo(req: GenerateRequest, apiKey: string) {
 
   // Get image URL from startFrame or inputImages[0]
   const imageUrl = req.startFrame ?? req.inputImages?.[0];
+  if ((req.inputImages?.length ?? 0) > 1 && !req.startFrame) {
+    throw new Error(
+      'xAI video generation supports only 1 input image (image_url). ' +
+        'Provide exactly one --input or use --start-frame.'
+    );
+  }
   log(
     'Starting video generation, model:',
     model,
@@ -332,7 +345,10 @@ async function generateXaiVideo(req: GenerateRequest, apiKey: string) {
 }
 
 const xaiCapabilities: ProviderCapabilities = {
+  // xAI docs show a single image_url for edits and a single image_url for image-to-video.
   maxInputImages: 1,
+  // xAI aspect_ratio examples show "4:3"; docs don't publish a strict allowlist.
+  supportsCustomAspectRatio: true,
   supportsVideoInterpolation: false, // xAI does not support end frame
   videoDurationRange: [1, 15], // 1-15 seconds
   supportsImageEditing: true,

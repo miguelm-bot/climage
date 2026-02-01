@@ -176,6 +176,8 @@ function buildImageInput(req: GenerateRequest): Record<string, unknown> {
 
 const falCapabilities: ProviderCapabilities = {
   maxInputImages: 7, // Vidu supports up to 7 reference images
+  // fal models vary. We map common ratios to enums, but also allow custom pass-through.
+  supportsCustomAspectRatio: true,
   supportsVideoInterpolation: true, // Vidu start-end-to-video
   videoDurationRange: [2, 8], // Vidu supports 2-8 seconds
   supportsImageEditing: true,
