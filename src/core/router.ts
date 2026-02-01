@@ -227,7 +227,7 @@ export async function generateMedia(
   for (let i = 0; i < partials.length; i++) {
     const p: GeneratedMediaPartial | undefined = partials[i];
     if (!p) continue;
-    const filePath = makeOutputPath(req, i);
+    const filePath = makeOutputPath(req, i, p.mimeType);
     log(verbose, `Writing ${p.bytes.byteLength} bytes to: ${filePath}`);
     await writeMediaFile(filePath, p.bytes);
     items.push({ ...p, filePath });
