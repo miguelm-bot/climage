@@ -105,7 +105,7 @@ npx climage "a cinematic shot of a corgi running" --type video
 - **Google (Veo 3.1):** up to 3 reference images via repeated `--input`.
 - **fal.ai:** up to 7 reference images via repeated `--input` (model-dependent).
 - **OpenAI:** uses first `--input` as image and second (optional) as mask.
-- **xAI:** currently uses only the first `--input` for edits / image-to-video.
+- **xAI:** exactly **one** `--input` is supported for edits / image-to-video.
 
 ## Examples
 

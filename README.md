@@ -145,7 +145,7 @@ FAL_KEY=... npx climage "A cat in a tree" --provider fal
 Edit existing images by providing an input image:
 
 ```bash
-# Edit with xAI (currently uses only the first input image)
+# Edit with xAI (exactly one input image supported)
 npx climage "make the cat orange" --provider xai --input photo.jpg
 
 # Edit with Google Gemini
