@@ -81,8 +81,8 @@ function supportedAspectRatiosForModel(model: string): string[] {
     // DALL·E 2 only supports square sizes.
     return ['1:1'];
   }
-  // Unknown model: be conservative.
-  return ['1:1'];
+  // Unknown model: we don't know what aspect ratios map to sizes.
+  return [];
 }
 
 // Map aspect ratios to OpenAI size parameters
@@ -147,9 +147,10 @@ async function generateWithEdit(
   // Add size if specified
   const size = mapAspectRatioToSize(req.aspectRatio, model);
   if (req.aspectRatio && !size) {
+    const supported = supportedAspectRatiosForModel(model);
     throw new Error(
       `OpenAI model ${model} does not support aspect ratio "${req.aspectRatio}". ` +
-        `Supported: ${supportedAspectRatiosForModel(model).join(', ')}`
+        `Supported: ${supported.length ? supported.join(', ') : 'unknown (model not recognized)'}`
     );
   }
   if (size) formData.append('size', size);
@@ -259,9 +260,10 @@ export const openaiProvider: Provider = {
 
     const size = mapAspectRatioToSize(req.aspectRatio, model);
     if (req.aspectRatio && !size) {
+      const supported = supportedAspectRatiosForModel(model);
       throw new Error(
         `OpenAI model ${model} does not support aspect ratio "${req.aspectRatio}". ` +
-          `Supported: ${supportedAspectRatiosForModel(model).join(', ')}`
+          `Supported: ${supported.length ? supported.join(', ') : 'unknown (model not recognized)'}`
       );
     }
 

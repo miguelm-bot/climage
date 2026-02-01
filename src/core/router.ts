@@ -128,16 +128,22 @@ function validateRequestForProvider(req: GenerateRequest, provider: Provider): v
     );
   }
 
-  // Validate aspect ratio (when provider declares supported ratios)
+  // Validate aspect ratio
   if (req.aspectRatio) {
-    const ar = req.aspectRatio.trim();
+    const normalized = req.aspectRatio.trim().replace(/\s+/g, '');
 
-    // Providers that explicitly support custom ratios may also accept provider-specific enums.
-    if (caps.supportsCustomAspectRatio === true) return;
+    // Always enforce a basic w:h shape to avoid passing junk downstream.
+    const looksLikeRatio = /^\d+:\d+$/.test(normalized);
+    if (!looksLikeRatio) {
+      throw new Error(`Invalid aspect ratio: "${req.aspectRatio}" (expected format: w:h)`);
+    }
 
-    // If provider has an allowlist, validate against it.
-    if (Array.isArray(caps.supportedAspectRatios) && caps.supportedAspectRatios.length) {
-      const normalized = ar.replace(/\s+/g, '');
+    // If provider has an allowlist and does NOT support arbitrary custom ratios, validate against it.
+    if (
+      caps.supportsCustomAspectRatio !== true &&
+      Array.isArray(caps.supportedAspectRatios) &&
+      caps.supportedAspectRatios.length
+    ) {
       const ok = caps.supportedAspectRatios.includes(normalized);
       if (!ok) {
         throw new Error(
@@ -145,13 +151,6 @@ function validateRequestForProvider(req: GenerateRequest, provider: Provider): v
             `Supported: ${caps.supportedAspectRatios.join(', ')}`
         );
       }
-      return;
-    }
-
-    // Otherwise enforce basic w:h format to avoid passing junk.
-    const looksLikeRatio = /^\d+\s*:\s*\d+$/.test(ar);
-    if (!looksLikeRatio) {
-      throw new Error(`Invalid aspect ratio: "${req.aspectRatio}" (expected format: w:h)`);
     }
   }
 
