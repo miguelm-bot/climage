@@ -227,13 +227,14 @@ async function generateXaiVideo(req: GenerateRequest, apiKey: string) {
   );
 
   // xAI is async: create request_id, then poll /v1/videos/{request_id}
-  // Note: xAI video API uses image_url as a string (data URI or URL), not an object
+  // NOTE: xAI uses an OpenAI-like schema for image inputs. For video generation,
+  // providing a plain `image_url` string may be accepted but ignored by the model.
+  // Use the object form `{ image: { url } }` so --start-frame is actually applied.
   const createBody: Record<string, unknown> = {
     prompt: req.prompt,
     model,
     ...(req.aspectRatio ? { aspect_ratio: req.aspectRatio } : {}),
-    // Add image_url for image-to-video (data URI or URL string)
-    ...(imageUrl ? { image_url: imageUrl } : {}),
+    ...(imageUrl ? { image: { url: imageUrl } } : {}),
     // Add duration (xAI supports 1-15 seconds)
     ...(req.duration !== undefined ? { duration: req.duration } : {}),
   };
@@ -241,8 +242,8 @@ async function generateXaiVideo(req: GenerateRequest, apiKey: string) {
     'Request body:',
     JSON.stringify({
       ...createBody,
-      image_url: createBody.image_url
-        ? `...(${String(createBody.image_url).length} chars)`
+      image: createBody.image
+        ? { url: `...(${String((createBody.image as any).url).length} chars)` }
         : undefined,
     })
   );
