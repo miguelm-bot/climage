@@ -100,11 +100,12 @@ Set one of:
 
 **Models:**
 
-| Model                 | Description                            |
-| --------------------- | -------------------------------------- |
-| `fal-ai/flux/dev`     | **Default.** Flux dev (fast & popular) |
-| `fal-ai/flux/pro`     | Flux pro (higher quality)              |
-| `fal-ai/flux-realism` | Photorealistic style                   |
+| Model                                      | Description                            |
+| ------------------------------------------ | -------------------------------------- |
+| `fal-ai/flux/dev`                          | **Default.** Flux dev (fast & popular) |
+| `fal-ai/flux/pro`                          | Flux pro (higher quality)              |
+| `fal-ai/flux-realism`                      | Photorealistic style                   |
+| `fal-ai/kling-video/v3/pro/image-to-video` | Kling v3 Pro image-to-video            |
 
 Example:
 
@@ -159,6 +160,9 @@ npx climage "the scene comes to life" --video --provider google --start-frame sc
 # Image-to-video with fal.ai
 npx climage "dramatic camera zoom" --video --provider fal --start-frame photo.jpg
 
+# Image-to-video with fal.ai Kling v3 Pro
+npx climage "dramatic camera zoom" --video --provider fal --model fal-ai/kling-video/v3/pro/image-to-video --start-frame photo.jpg
+
 # Image-to-video with xAI
 npx climage "animate this scene" --video --provider xai --start-frame cat.png
 ```
@@ -197,7 +201,9 @@ npx climage "character in motion" --video --provider fal --input ref1.png --inpu
 | Image-to-Video           | Yes    | Yes  | Yes    | No     |
 | Video Interpolation      | Yes    | No   | Yes    | No     |
 | Max Input Images         | 3      | 1    | 7      | 2      |
-| Video Duration (seconds) | 4-8    | 1-15 | 2-8    | N/A    |
+| Video Duration (seconds) | 4-8    | 1-15 | 2-15\* | N/A    |
+
+\* Model-specific on fal.ai (e.g. Vidu: 2-8, Kling v3 Pro: 3-15).
 
 ## Library API
 

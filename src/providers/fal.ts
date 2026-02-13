@@ -59,8 +59,17 @@ const DEFAULT_IMAGE_MODEL = 'fal-ai/flux/dev';
 const DEFAULT_IMAGE_TO_IMAGE_MODEL = 'fal-ai/flux/dev/image-to-image';
 const DEFAULT_VIDEO_MODEL = 'fal-ai/ltxv-2/text-to-video/fast'; // LTX Video 2.0 Fast - very quick
 const DEFAULT_IMAGE_TO_VIDEO_MODEL = 'fal-ai/vidu/q2/image-to-video'; // Vidu Q2 for image-to-video
+const KLING_V3_PRO_IMAGE_TO_VIDEO_MODEL = 'fal-ai/kling-video/v3/pro/image-to-video';
 const DEFAULT_START_END_VIDEO_MODEL = 'fal-ai/vidu/start-end-to-video'; // Vidu for start-end interpolation
 const DEFAULT_REFERENCE_VIDEO_MODEL = 'fal-ai/vidu/q2/reference-to-video'; // Vidu Q2 for reference images
+
+function isKlingV3Model(model: string): boolean {
+  return model === KLING_V3_PRO_IMAGE_TO_VIDEO_MODEL || model.startsWith('fal-ai/kling-video/v3/');
+}
+
+function isViduModel(model: string): boolean {
+  return model.includes('/vidu/');
+}
 
 /**
  * Determine the best model based on request inputs.
@@ -100,9 +109,13 @@ function selectImageModel(req: GenerateRequest): string {
 /**
  * Map aspect ratio string to fal enum values.
  */
-function mapAspectRatio(aspectRatio?: string): string | undefined {
+function mapAspectRatio(aspectRatio?: string, model?: string): string | undefined {
   if (!aspectRatio) return undefined;
   const ar = aspectRatio.trim();
+  if (model && isKlingV3Model(model)) {
+    // Kling expects literal ratios like 16:9, 9:16, 1:1
+    return ar;
+  }
   if (ar === '1:1') return 'square';
   if (ar === '4:3') return 'landscape_4_3';
   if (ar === '16:9') return 'landscape_16_9';
@@ -114,7 +127,7 @@ function mapAspectRatio(aspectRatio?: string): string | undefined {
 /**
  * Build input for video generation based on request parameters.
  */
-function buildVideoInput(req: GenerateRequest): Record<string, unknown> {
+function buildVideoInput(req: GenerateRequest, model: string): Record<string, unknown> {
   const input: Record<string, unknown> = {
     prompt: req.prompt,
   };
@@ -123,14 +136,25 @@ function buildVideoInput(req: GenerateRequest): Record<string, unknown> {
   if (req.startFrame && req.endFrame) {
     input.start_image_url = req.startFrame;
     input.end_image_url = req.endFrame;
-    // Vidu supports movement_amplitude
+    const ar = mapAspectRatio(req.aspectRatio, model);
+    if (ar) input.aspect_ratio = ar;
+    if (req.duration) input.duration = String(req.duration);
     return input;
   }
 
   // Reference images (Vidu reference-to-video)
   if (req.inputImages?.length && !req.startFrame) {
+    if (isKlingV3Model(model)) {
+      // Kling v3 image-to-video models require a start image.
+      input.start_image_url = req.inputImages[0];
+      const ar = mapAspectRatio(req.aspectRatio, model);
+      if (ar) input.aspect_ratio = ar;
+      if (req.duration) input.duration = String(req.duration);
+      return input;
+    }
+
     input.reference_image_urls = req.inputImages.slice(0, 7); // Max 7 reference images
-    const ar = mapAspectRatio(req.aspectRatio);
+    const ar = mapAspectRatio(req.aspectRatio, model);
     if (ar) input.aspect_ratio = ar;
     if (req.duration) input.duration = String(req.duration); // Vidu uses string enum
     return input;
@@ -139,13 +163,25 @@ function buildVideoInput(req: GenerateRequest): Record<string, unknown> {
   // Single image → image-to-video
   const imageUrl = req.startFrame ?? req.inputImages?.[0];
   if (imageUrl) {
-    input.image_url = imageUrl;
+    if (isKlingV3Model(model)) {
+      input.start_image_url = imageUrl;
+      const ar = mapAspectRatio(req.aspectRatio, model);
+      if (ar) input.aspect_ratio = ar;
+    } else {
+      input.image_url = imageUrl;
+    }
     if (req.duration) input.duration = String(req.duration);
     return input;
   }
 
+  if (isKlingV3Model(model)) {
+    throw new Error(
+      `Model ${model} requires --start-frame (or --input) because it is image-to-video only`
+    );
+  }
+
   // Text-to-video
-  const imageSize = mapAspectRatio(req.aspectRatio);
+  const imageSize = mapAspectRatio(req.aspectRatio, model);
   if (imageSize) input.image_size = imageSize;
   if (req.n) input.num_videos = req.n;
 
@@ -177,7 +213,7 @@ function buildImageInput(req: GenerateRequest): Record<string, unknown> {
 const falCapabilities: ProviderCapabilities = {
   maxInputImages: 7, // Vidu supports up to 7 reference images
   supportsVideoInterpolation: true, // Vidu start-end-to-video
-  videoDurationRange: [2, 8], // Vidu supports 2-8 seconds
+  videoDurationRange: [2, 15], // Most models are 2-8; Kling v3 supports up to 15
   supportsImageEditing: true,
 };
 
@@ -212,8 +248,21 @@ export const falProvider: Provider = {
     const model = req.kind === 'video' ? selectVideoModel(req) : selectImageModel(req);
     log(verbose, 'Selected model:', model);
 
+    if (req.kind === 'video' && req.duration !== undefined) {
+      if (isKlingV3Model(model) && (req.duration < 3 || req.duration > 15)) {
+        throw new Error(
+          `Model ${model} supports video duration 3-15s, but ${req.duration}s requested`
+        );
+      }
+      if (isViduModel(model) && (req.duration < 2 || req.duration > 8)) {
+        throw new Error(
+          `Model ${model} supports video duration 2-8s, but ${req.duration}s requested`
+        );
+      }
+    }
+
     // Build input based on kind
-    const input = req.kind === 'video' ? buildVideoInput(req) : buildImageInput(req);
+    const input = req.kind === 'video' ? buildVideoInput(req, model) : buildImageInput(req);
 
     // Log input without large data URIs
     const inputSummary = { ...input };
