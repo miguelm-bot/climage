@@ -5,3 +5,5 @@ dist/
 .env.*
 *.tgz
 npm-debug.log*
+
+tmp/

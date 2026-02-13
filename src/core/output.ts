@@ -36,9 +36,34 @@ export function resolveOutDir(outDir: string): string {
   return path.isAbsolute(outDir) ? outDir : path.resolve(process.cwd(), outDir);
 }
 
-export function makeOutputPath(req: GenerateRequest, index: number): string {
-  const ext = extensionForFormat(req.format);
+function extensionFromMimeType(mimeType: string | undefined): string | undefined {
+  if (!mimeType) return undefined;
+
+  const t = mimeType.toLowerCase().split(';')[0]?.trim();
+  if (!t) return undefined;
+
+  // Images
+  if (t === 'image/png') return 'png';
+  if (t === 'image/jpeg') return 'jpg';
+  if (t === 'image/webp') return 'webp';
+  if (t === 'image/gif') return 'gif';
+  if (t === 'image/avif') return 'avif';
+
+  // Videos
+  if (t === 'video/mp4') return 'mp4';
+  if (t === 'video/webm') return 'webm';
+
+  return undefined;
+}
+
+export function makeOutputPath(req: GenerateRequest, index: number, mimeType?: string): string {
+  // If user explicitly requested an output path, respect it verbatim.
   if (req.out) return path.resolve(process.cwd(), req.out);
+
+  // Some providers return a different MIME type than requested (e.g. JPEG bytes even if
+  // --format png was requested). Prefer the actual MIME type for file extension to avoid
+  // misleading file names.
+  const ext = extensionFromMimeType(mimeType) ?? extensionForFormat(req.format);
 
   const base = `${req.nameBase}-${req.timestamp}`;
   const suffix = req.n > 1 ? `-${String(index + 1).padStart(2, '0')}` : '';

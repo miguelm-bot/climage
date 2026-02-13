@@ -115,6 +115,13 @@ async function editXaiImages(req: GenerateRequest, apiKey: string) {
   const inputImage = req.inputImages?.[0];
   if (!inputImage) throw new Error('No input image provided for editing');
 
+  if ((req.inputImages?.length ?? 0) > 1) {
+    throw new Error(
+      'xAI image editing supports only 1 input image (image_url). ' +
+        'Provide exactly one --input for xAI edits.'
+    );
+  }
+
   log('Starting image editing, model:', model, 'n:', req.n);
 
   const body: Record<string, unknown> = {
@@ -204,6 +211,12 @@ async function generateXaiVideo(req: GenerateRequest, apiKey: string) {
 
   // Get image URL from startFrame or inputImages[0]
   const imageUrl = req.startFrame ?? req.inputImages?.[0];
+  if ((req.inputImages?.length ?? 0) > 1 && !req.startFrame) {
+    throw new Error(
+      'xAI video generation supports only 1 input image (image_url). ' +
+        'Provide exactly one --input or use --start-frame.'
+    );
+  }
   log(
     'Starting video generation, model:',
     model,
@@ -214,13 +227,14 @@ async function generateXaiVideo(req: GenerateRequest, apiKey: string) {
   );
 
   // xAI is async: create request_id, then poll /v1/videos/{request_id}
-  // Note: xAI video API uses image_url as a string (data URI or URL), not an object
+  // NOTE: xAI uses an OpenAI-like schema for image inputs. For video generation,
+  // providing a plain `image_url` string may be accepted but ignored by the model.
+  // Use the object form `{ image: { url } }` so --start-frame is actually applied.
   const createBody: Record<string, unknown> = {
     prompt: req.prompt,
     model,
     ...(req.aspectRatio ? { aspect_ratio: req.aspectRatio } : {}),
-    // Add image_url for image-to-video (data URI or URL string)
-    ...(imageUrl ? { image_url: imageUrl } : {}),
+    ...(imageUrl ? { image: { url: imageUrl } } : {}),
     // Add duration (xAI supports 1-15 seconds)
     ...(req.duration !== undefined ? { duration: req.duration } : {}),
   };
@@ -228,8 +242,8 @@ async function generateXaiVideo(req: GenerateRequest, apiKey: string) {
     'Request body:',
     JSON.stringify({
       ...createBody,
-      image_url: createBody.image_url
-        ? `...(${String(createBody.image_url).length} chars)`
+      image: createBody.image
+        ? { url: `...(${String((createBody.image as any).url).length} chars)` }
         : undefined,
     })
   );
@@ -332,7 +346,10 @@ async function generateXaiVideo(req: GenerateRequest, apiKey: string) {
 }
 
 const xaiCapabilities: ProviderCapabilities = {
+  // xAI docs show a single image_url for edits and a single image_url for image-to-video.
   maxInputImages: 1,
+  // xAI aspect_ratio examples show "4:3"; docs don't publish a strict allowlist.
+  supportsCustomAspectRatio: true,
   supportsVideoInterpolation: false, // xAI does not support end frame
   videoDurationRange: [1, 15], // 1-15 seconds
   supportsImageEditing: true,

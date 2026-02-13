@@ -110,6 +110,9 @@ async function sleep(ms: number) {
 
 const googleCapabilities: ProviderCapabilities = {
   maxInputImages: 3, // Veo 3.1 supports up to 3 reference images
+  // Imagen / Veo aspect ratio is expressed as "w:h" (e.g. "16:9").
+  // Public docs/examples focus on the common set below.
+  supportedAspectRatios: ['1:1', '4:3', '3:4', '16:9', '9:16'],
   supportsVideoInterpolation: true, // Veo 3.1 supports first + last frame
   videoDurationRange: [4, 8], // Veo 3.1 supports 4, 6, 8 seconds
   supportsImageEditing: true,
@@ -369,6 +372,9 @@ async function generateWithGemini(
         contents: buildContents() as any,
         config: {
           responseModalities: ['IMAGE'],
+          // Gemini native image generation (Nano Banana) supports aspect ratio via imageConfig.
+          // Note: when editing from an input image, the model may still bias toward the input image's aspect.
+          ...(req.aspectRatio ? { imageConfig: { aspectRatio: req.aspectRatio } } : {}),
         },
       });
 
