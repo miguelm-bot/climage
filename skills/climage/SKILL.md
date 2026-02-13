@@ -58,11 +58,12 @@ npx climage "a cinematic shot of a corgi running" --type video
 
 (Depends on model; many support image and/or video)
 
-| Model                 | Description               |
-| --------------------- | ------------------------- |
-| `fal-ai/flux/dev`     | **Default.** Flux dev     |
-| `fal-ai/flux/pro`     | Flux pro (higher quality) |
-| `fal-ai/flux-realism` | Photorealistic            |
+| Model                                      | Description                 |
+| ------------------------------------------ | --------------------------- |
+| `fal-ai/flux/dev`                          | **Default.** Flux dev       |
+| `fal-ai/flux/pro`                          | Flux pro (higher quality)   |
+| `fal-ai/flux-realism`                      | Photorealistic              |
+| `fal-ai/kling-video/v3/pro/image-to-video` | Kling v3 Pro image-to-video |
 
 ## API Keys
 
