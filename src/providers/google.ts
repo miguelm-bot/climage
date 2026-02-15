@@ -1,4 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import type {
   GenerateRequest,
@@ -79,6 +82,26 @@ function imageToGoogleFormat(
   return { fileUri: imageInput };
 }
 
+// Veo video endpoints expect Image = { imageBytes, mimeType } or { gcsUri }.
+// This differs from Gemini generateContent image parts.
+function imageToVeoFormat(
+  imageInput: string
+): { imageBytes: string; mimeType: string } | { gcsUri: string } {
+  if (imageInput.startsWith('data:')) {
+    const parsed = parseDataUri(imageInput);
+    if (!parsed?.data) {
+      throw new Error('Failed to parse data URI for Veo image input');
+    }
+    return { imageBytes: parsed.data, mimeType: parsed.mimeType };
+  }
+  if (imageInput.startsWith('gs://')) {
+    return { gcsUri: imageInput };
+  }
+  throw new Error(
+    `Veo image inputs must be data: URIs or gs:// URIs (got ${imageInput.slice(0, 24)}...)`
+  );
+}
+
 // Gemini native image models (use generateContent with IMAGE modality)
 const GEMINI_IMAGE_MODELS = ['gemini-2.5-flash-image', 'gemini-3-pro-image-preview'];
 
@@ -102,6 +125,43 @@ async function downloadBytes(
   const ct = res.headers.get('content-type') || undefined;
   log(`Downloaded ${ab.byteLength} bytes in ${Date.now() - start}ms, type: ${ct}`);
   return { bytes: new Uint8Array(ab), mimeType: ct };
+}
+
+async function downloadGeneratedVideo(
+  ai: GoogleGenAI,
+  generatedVideo: Record<string, any>
+): Promise<{ bytes: Uint8Array; mimeType: string | undefined }> {
+  const video = generatedVideo?.video as
+    | { uri?: string; videoBytes?: string; mimeType?: string }
+    | undefined;
+
+  // Some responses include inline bytes directly.
+  if (video?.videoBytes) {
+    return {
+      bytes: new Uint8Array(Buffer.from(video.videoBytes, 'base64')),
+      mimeType: video.mimeType,
+    };
+  }
+
+  // Fast path for directly downloadable URLs.
+  if (video?.uri && !video.uri.startsWith('gs://')) {
+    try {
+      return await downloadBytes(video.uri);
+    } catch (err) {
+      log('Direct video download failed, falling back to ai.files.download:', String(err));
+    }
+  }
+
+  // Fallback path that lets the SDK handle auth/download mechanics.
+  const tempDir = await mkdtemp(join(tmpdir(), 'climage-veo-'));
+  const downloadPath = join(tempDir, 'video.mp4');
+  try {
+    await ai.files.download({ file: generatedVideo as any, downloadPath });
+    const buf = await readFile(downloadPath);
+    return { bytes: new Uint8Array(buf), mimeType: video?.mimeType ?? 'video/mp4' };
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
 }
 
 async function sleep(ms: number) {
@@ -200,17 +260,17 @@ async function generateWithVeo(
   const config: Record<string, unknown> = {
     numberOfVideos: req.n,
     ...(req.aspectRatio ? { aspectRatio: req.aspectRatio } : {}),
-    // Add duration if specified (Veo 3.1 supports 4, 6, 8)
-    ...(req.duration !== undefined ? { durationSeconds: String(req.duration) } : {}),
+    // Add duration if specified (Veo supports 4-8 seconds depending on model)
+    ...(req.duration !== undefined ? { durationSeconds: req.duration } : {}),
   };
 
   // Build reference images array for Veo 3.1 (up to 3 images)
   if (req.inputImages?.length && isVeo31Model(model)) {
     const referenceImages = req.inputImages.slice(0, 3).map((img) => {
-      const imageData = imageToGoogleFormat(img);
+      const imageData = imageToVeoFormat(img);
       return {
         image: imageData,
-        referenceType: 'asset' as const,
+        referenceType: 'ASSET' as const,
       };
     });
     (config as any).referenceImages = referenceImages;
@@ -228,14 +288,14 @@ async function generateWithVeo(
   const firstFrameImage =
     req.startFrame ?? (req.inputImages?.length === 1 ? req.inputImages[0] : undefined);
   if (firstFrameImage && isVeo31Model(model)) {
-    const imageData = imageToGoogleFormat(firstFrameImage);
+    const imageData = imageToVeoFormat(firstFrameImage);
     (generateParams as any).image = imageData;
     log('Added first frame image');
   }
 
   // Add lastFrame for Veo 3.1 interpolation
   if (req.endFrame && isVeo31Model(model)) {
-    const lastFrameData = imageToGoogleFormat(req.endFrame);
+    const lastFrameData = imageToVeoFormat(req.endFrame);
     (config as any).lastFrame = lastFrameData;
     log('Added last frame for interpolation');
   }
@@ -284,29 +344,30 @@ async function generateWithVeo(
   for (let i = 0; i < Math.min(videos.length, req.n); i++) {
     const v = videos[i];
     log(`Processing video ${i}:`, JSON.stringify(v).slice(0, 300));
-    const uri = (v as any)?.video?.uri as string | undefined;
-    if (!uri) {
-      log(`Video ${i} has no URI, skipping`);
+    if (!(v as any)?.video) {
+      log(`Video ${i} has no video payload, skipping`);
       continue;
     }
-
-    // SDK may return gs:// URIs on Vertex; we only support downloadable http(s) URLs.
-    if (uri.startsWith('gs://')) {
-      throw new Error(
-        `Google Veo returned a gs:// URI (${uri}). Configure outputGcsUri / Vertex flow to fetch from GCS.`
-      );
-    }
-
-    const { bytes, mimeType } = await downloadBytes(uri);
-    out.push({
+    const uri = (v as any)?.video?.uri as string | undefined;
+    const { bytes, mimeType } = await downloadGeneratedVideo(ai, v as any);
+    const item: {
+      kind: 'video';
+      provider: 'google';
+      model?: string;
+      index: number;
+      url?: string;
+      bytes: Uint8Array;
+      mimeType?: string;
+    } = {
       kind: 'video',
       provider: 'google',
       model,
       index: i,
-      url: uri,
       bytes,
       ...(mimeType !== undefined ? { mimeType } : {}),
-    });
+    };
+    if (uri) item.url = uri;
+    out.push(item);
   }
 
   if (!out.length) throw new Error('Google Veo returned videos but none were downloadable');
