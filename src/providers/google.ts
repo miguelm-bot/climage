@@ -79,6 +79,24 @@ function imageToGoogleFormat(
   return { fileUri: imageInput };
 }
 
+// Veo video endpoints use a different image struct than Gemini generateContent.
+// They expect { bytesBase64Encoded, mimeType } (NOT { inlineData: { data, mimeType } }).
+function imageToVeoFormat(imageInput: string): {
+  bytesBase64Encoded: string;
+  mimeType: string;
+} {
+  if (!imageInput.startsWith('data:')) {
+    throw new Error(
+      `Veo image inputs must be provided as data: URIs (got ${imageInput.slice(0, 24)}...)`
+    );
+  }
+  const parsed = parseDataUri(imageInput);
+  if (!parsed?.data) {
+    throw new Error('Failed to parse data URI for Veo image input');
+  }
+  return { bytesBase64Encoded: parsed.data, mimeType: parsed.mimeType };
+}
+
 // Gemini native image models (use generateContent with IMAGE modality)
 const GEMINI_IMAGE_MODELS = ['gemini-2.5-flash-image', 'gemini-3-pro-image-preview'];
 
@@ -200,14 +218,14 @@ async function generateWithVeo(
   const config: Record<string, unknown> = {
     numberOfVideos: req.n,
     ...(req.aspectRatio ? { aspectRatio: req.aspectRatio } : {}),
-    // Add duration if specified (Veo 3.1 supports 4, 6, 8)
-    ...(req.duration !== undefined ? { durationSeconds: String(req.duration) } : {}),
+    // Add duration if specified (Veo supports 4-8 seconds depending on model)
+    ...(req.duration !== undefined ? { durationSeconds: req.duration } : {}),
   };
 
   // Build reference images array for Veo 3.1 (up to 3 images)
   if (req.inputImages?.length && isVeo31Model(model)) {
     const referenceImages = req.inputImages.slice(0, 3).map((img) => {
-      const imageData = imageToGoogleFormat(img);
+      const imageData = imageToVeoFormat(img);
       return {
         image: imageData,
         referenceType: 'asset' as const,
@@ -228,14 +246,14 @@ async function generateWithVeo(
   const firstFrameImage =
     req.startFrame ?? (req.inputImages?.length === 1 ? req.inputImages[0] : undefined);
   if (firstFrameImage && isVeo31Model(model)) {
-    const imageData = imageToGoogleFormat(firstFrameImage);
+    const imageData = imageToVeoFormat(firstFrameImage);
     (generateParams as any).image = imageData;
     log('Added first frame image');
   }
 
   // Add lastFrame for Veo 3.1 interpolation
   if (req.endFrame && isVeo31Model(model)) {
-    const lastFrameData = imageToGoogleFormat(req.endFrame);
+    const lastFrameData = imageToVeoFormat(req.endFrame);
     (config as any).lastFrame = lastFrameData;
     log('Added last frame for interpolation');
   }
