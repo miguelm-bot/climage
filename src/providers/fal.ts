@@ -71,6 +71,10 @@ function isViduModel(model: string): boolean {
   return model.includes('/vidu/');
 }
 
+function isHunyuanEditModel(model: string): boolean {
+  return model.includes('/hunyuan-image/') && model.includes('/edit');
+}
+
 /**
  * Determine the best model based on request inputs.
  */
@@ -200,11 +204,17 @@ function buildImageInput(req: GenerateRequest): Record<string, unknown> {
   if (imageSize) input.image_size = imageSize;
   if (req.n) input.num_images = req.n;
 
-  // Image-to-image: add input image
+  // Image-to-image: add input image(s)
   if (req.inputImages?.[0]) {
-    input.image_url = req.inputImages[0];
-    // Common i2i parameters
-    input.strength = 0.75; // Default strength for image-to-image
+    const model = req.model ?? '';
+    if (isHunyuanEditModel(model)) {
+      // Hunyuan edit expects image_urls (array), up to 3 images
+      input.image_urls = req.inputImages.slice(0, 3);
+    } else {
+      input.image_url = req.inputImages[0];
+      // Common i2i parameters
+      input.strength = 0.75; // Default strength for image-to-image
+    }
   }
 
   return input;
