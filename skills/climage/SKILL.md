@@ -183,6 +183,9 @@ npx climage "make the cat blue" --provider xai --input cat.jpg
 
 # Edit with OpenAI (supports optional mask as second input)
 npx climage "replace the sky" --provider openai --input photo.png --input mask.png
+
+# Edit with Vercel AI Gateway
+npx climage "make the sky pink" --provider vercel --input photo.png
 ```
 
 ## Image-to-Video
