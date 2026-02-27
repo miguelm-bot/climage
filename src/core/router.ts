@@ -24,8 +24,15 @@ import { xaiProvider } from '../providers/xai.js';
 import { falProvider } from '../providers/fal.js';
 import { googleProvider } from '../providers/google.js';
 import { openaiProvider } from '../providers/openai.js';
+import { vercelProvider } from '../providers/vercel.js';
 
-const providers: Provider[] = [googleProvider, xaiProvider, falProvider, openaiProvider];
+const providers: Provider[] = [
+  googleProvider,
+  xaiProvider,
+  falProvider,
+  openaiProvider,
+  vercelProvider,
+];
 
 function log(verbose: boolean, ...args: unknown[]) {
   if (verbose) console.error('[router]', ...args);

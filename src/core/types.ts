@@ -1,4 +1,4 @@
-export type ProviderId = 'auto' | 'xai' | 'fal' | 'google' | 'openai';
+export type ProviderId = 'auto' | 'xai' | 'fal' | 'google' | 'openai' | 'vercel';
 
 export type MediaKind = 'image' | 'video';
 

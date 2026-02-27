@@ -43,6 +43,7 @@ Env:
   XAI_API_KEY (or XAI_TOKEN, GROK_API_KEY)
   FAL_KEY (or FAL_API_KEY)
   OPENAI_API_KEY
+  AI_GATEWAY_API_KEY (Vercel AI Gateway)
 
 Examples:
   npx climage "make image of kitten"
