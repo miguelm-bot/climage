@@ -37,7 +37,7 @@ function dataUriToUint8Array(dataUri: string): Uint8Array {
 
 // Default models (cheapest / most accessible options)
 const DEFAULT_VIDEO_MODEL = 'xai/grok-imagine-video';
-const DEFAULT_IMAGE_MODEL = 'xai/grok-2-image';
+const DEFAULT_IMAGE_MODEL = 'xai/grok-imagine-image';
 
 async function generateVercelVideo(
   req: GenerateRequest,
