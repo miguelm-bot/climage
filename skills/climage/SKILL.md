@@ -5,7 +5,7 @@ description: Generate images or videos from the terminal or code using climage. 
 
 # climage
 
-Generate images and videos via multiple AI providers (Google Nano Banana/Imagen/Veo, OpenAI GPT Image, xAI Grok, fal.ai).
+Generate images and videos via multiple AI providers (Google Nano Banana/Imagen/Veo, OpenAI GPT Image, xAI Grok, fal.ai, Vercel AI Gateway).
 
 ## Quick Start
 
@@ -30,6 +30,7 @@ npx climage "a cinematic shot of a corgi running" --type video
 | `imagen-4.0-generate-001`        | -                 | Imagen 4 Standard                                    |
 | `imagen-4.0-ultra-generate-001`  | -                 | Imagen 4 Ultra                                       |
 | `imagen-4.0-fast-generate-001`   | -                 | Imagen 4 Fast                                        |
+| Any `gemini-*` model             | -                 | Auto-routed to generateContent                       |
 
 **Video (Veo)**
 
@@ -66,19 +67,48 @@ npx climage "a cinematic shot of a corgi running" --type video
 | `fal-ai/flux-realism`                      | Photorealistic              |
 | `fal-ai/kling-video/v3/pro/image-to-video` | Kling v3 Pro image-to-video |
 
+### Vercel AI Gateway
+
+Access 17+ video models and 6+ image models from multiple providers through a single API key.
+
+**Video**
+
+| Model                         | Provider  | Description              |
+| ----------------------------- | --------- | ------------------------ |
+| `xai/grok-imagine-video`      | xAI       | **Default.** Fast, cheap |
+| `alibaba/wan-v2.6-t2v`        | Alibaba   | Text-to-video            |
+| `alibaba/wan-v2.6-i2v`        | Alibaba   | Image-to-video           |
+| `alibaba/wan-v2.6-i2v-flash`  | Alibaba   | Image-to-video (fast)    |
+| `klingai/kling-v2.6-t2v`      | Kling AI  | Text-to-video            |
+| `klingai/kling-v2.6-i2v`      | Kling AI  | Image-to-video           |
+| `bytedance/seedance-v1.5-pro` | ByteDance | Cheapest ($0.01/sec)     |
+
+**Image**
+
+| Model                                   | Provider | Description             |
+| --------------------------------------- | -------- | ----------------------- |
+| `xai/grok-imagine-image`                | xAI      | **Default.** $0.02/img  |
+| `xai/grok-imagine-image-pro`            | xAI      | Higher quality          |
+| `google/gemini-3.1-flash-image-preview` | Google   | Gemini native image gen |
+| `recraft/recraft-v4`                    | Recraft  | $0.04/img               |
+| `openai/gpt-image-1.5`                  | OpenAI   | $0.01/img + input costs |
+
+See all models at https://vercel.com/ai-gateway/models
+
 ## API Keys
 
-| Provider | Env Variable     |
-| -------- | ---------------- |
-| Google   | `GEMINI_API_KEY` |
-| OpenAI   | `OPENAI_API_KEY` |
-| xAI      | `XAI_API_KEY`    |
-| fal.ai   | `FAL_KEY`        |
+| Provider          | Env Variable         |
+| ----------------- | -------------------- |
+| Google            | `GEMINI_API_KEY`     |
+| OpenAI            | `OPENAI_API_KEY`     |
+| xAI               | `XAI_API_KEY`        |
+| fal.ai            | `FAL_KEY`            |
+| Vercel AI Gateway | `AI_GATEWAY_API_KEY` |
 
 ## CLI Options
 
 ```
---provider <auto|google|openai|xai|fal>     Provider selection
+--provider <auto|google|openai|xai|fal|vercel>  Provider selection
 --model <id>                               Model id (provider-specific)
 --n <1..10>                                Number of outputs
 --type <image|video>                       Output type (default: image)
@@ -124,6 +154,15 @@ npx climage "a neon hologram of a cat driving" --video
 # xAI video
 npx climage "a cat playing with a ball" --provider xai --video
 
+# Vercel AI Gateway video (access many providers with one key)
+npx climage "a puppy playing" --provider vercel --video --model xai/grok-imagine-video
+
+# Vercel AI Gateway image
+npx climage "mountain landscape" --provider vercel --model xai/grok-imagine-image
+
+# Vercel AI Gateway with Alibaba Wan
+npx climage "cinematic shot" --provider vercel --video --model alibaba/wan-v2.6-t2v
+
 # Multiple outputs with custom aspect ratio
 npx climage "wide landscape" --n 4 --aspect-ratio 16:9 --outDir ./out
 
@@ -159,6 +198,9 @@ npx climage "camera slowly zooms in" --video --provider fal --start-frame photo.
 
 # xAI with start frame
 npx climage "animate this image" --video --provider xai --start-frame cat.png --duration 5
+
+# Vercel AI Gateway with start frame
+npx climage "the scene comes alive" --video --provider vercel --start-frame photo.png --model xai/grok-imagine-video
 ```
 
 ## Video Interpolation
@@ -175,14 +217,14 @@ npx climage "morph between frames" --video --provider google --start-frame a.png
 
 ## Provider Capabilities
 
-| Feature             | Google | xAI | fal.ai | OpenAI |
-| ------------------- | ------ | --- | ------ | ------ |
-| Image Generation    | Yes    | Yes | Yes    | Yes    |
-| Image Editing       | Yes    | Yes | Yes    | Yes    |
-| Video Generation    | Yes    | Yes | Yes    | No     |
-| Image-to-Video      | Yes    | Yes | Yes    | No     |
-| Video Interpolation | Yes    | No  | Yes    | No     |
-| Max Input Images    | 3      | 1   | 7      | 2      |
+| Feature             | Google | xAI | fal.ai | OpenAI | Vercel AI Gateway     |
+| ------------------- | ------ | --- | ------ | ------ | --------------------- |
+| Image Generation    | Yes    | Yes | Yes    | Yes    | Yes (model-dependent) |
+| Image Editing       | Yes    | Yes | Yes    | Yes    | No                    |
+| Video Generation    | Yes    | Yes | Yes    | No     | Yes (17+ models)      |
+| Image-to-Video      | Yes    | Yes | Yes    | No     | Yes (model-dependent) |
+| Video Interpolation | Yes    | No  | Yes    | No     | No                    |
+| Max Input Images    | 3      | 1   | 7      | 2      | 1                     |
 
 ## Library API
 
@@ -221,6 +263,12 @@ const interpolated = await generateVideo('smooth transition', {
   provider: 'fal',
   startFrame: './before.png',
   endFrame: './after.png',
+});
+
+// Vercel AI Gateway (access many providers with one key)
+const gatewayVideo = await generateVideo('a puppy playing', {
+  provider: 'vercel',
+  model: 'xai/grok-imagine-video',
 });
 
 for (const item of [...images, ...videos]) {
