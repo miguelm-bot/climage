@@ -60,12 +60,15 @@ npx climage "a cinematic shot of a corgi running" --type video
 
 (Depends on model; many support image and/or video)
 
-| Model                                      | Description                 |
-| ------------------------------------------ | --------------------------- |
-| `fal-ai/flux/dev`                          | **Default.** Flux dev       |
-| `fal-ai/flux/pro`                          | Flux pro (higher quality)   |
-| `fal-ai/flux-realism`                      | Photorealistic              |
-| `fal-ai/kling-video/v3/pro/image-to-video` | Kling v3 Pro image-to-video |
+| Model                                            | Description                            |
+| ------------------------------------------------ | -------------------------------------- |
+| `fal-ai/flux/dev`                                | **Default.** Flux dev                  |
+| `fal-ai/flux/pro`                                | Flux pro (higher quality)              |
+| `fal-ai/flux-realism`                            | Photorealistic                         |
+| `fal-ai/hunyuan-image/v3/instruct/text-to-image` | Hunyuan Image 3.0 text-to-image        |
+| `fal-ai/hunyuan-image/v3/instruct/edit`          | Hunyuan Image 3.0 editing (image_urls) |
+| `fal-ai/kling-image/o1`                          | Kling Image o1 reference editing       |
+| `fal-ai/kling-video/v3/pro/image-to-video`       | Kling v3 Pro image-to-video            |
 
 ### Vercel AI Gateway
 

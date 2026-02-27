@@ -71,8 +71,15 @@ function isViduModel(model: string): boolean {
   return model.includes('/vidu/');
 }
 
-function isHunyuanEditModel(model: string): boolean {
-  return model.includes('/hunyuan-image/') && model.includes('/edit');
+/**
+ * Models that expect `image_urls` (array) instead of `image_url` (singular).
+ */
+function usesImageUrlsArray(model: string): boolean {
+  // Hunyuan edit endpoint
+  if (model.includes('/hunyuan-image/') && model.includes('/edit')) return true;
+  // Kling Image o1 (reference-based editing)
+  if (model.includes('/kling-image/')) return true;
+  return false;
 }
 
 /**
@@ -207,7 +214,7 @@ function buildImageInput(req: GenerateRequest): Record<string, unknown> {
   // Image-to-image: add input image(s)
   if (req.inputImages?.[0]) {
     const model = req.model ?? '';
-    if (isHunyuanEditModel(model)) {
+    if (usesImageUrlsArray(model)) {
       // Hunyuan edit expects image_urls (array), up to 3 images
       input.image_urls = req.inputImages.slice(0, 3);
     } else {
