@@ -103,20 +103,14 @@ function imageToVeoFormat(
   );
 }
 
-// Gemini native image models (use generateContent with IMAGE modality)
-const GEMINI_IMAGE_MODELS = [
-  'gemini-2.5-flash-image',
-  'gemini-3-pro-image-preview',
-  'gemini-3.1-flash-image-preview',
-];
-
 function resolveModel(model: string | undefined): string {
   if (!model) return 'gemini-2.5-flash-image'; // Default: Nano Banana (fast)
   return MODEL_ALIASES[model] ?? model;
 }
 
+// Gemini models use generateContent; Imagen models use generateImages.
 function isGeminiImageModel(model: string): boolean {
-  return GEMINI_IMAGE_MODELS.some((m) => model.startsWith(m));
+  return model.startsWith('gemini-');
 }
 
 async function downloadBytes(
