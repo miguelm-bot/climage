@@ -98,12 +98,26 @@ async function generateVercelImage(
   const model = req.model ?? DEFAULT_IMAGE_MODEL;
   log('Starting image generation, model:', model);
 
+  // Build prompt: string or { images, text } for image editing
+  const hasInputImages = req.inputImages && req.inputImages.length > 0;
+  let prompt: string | { images: Uint8Array[]; text: string };
+
+  if (hasInputImages) {
+    const images = req.inputImages!.map((img) =>
+      img.startsWith('data:') ? dataUriToUint8Array(img) : Uint8Array.from(Buffer.from(img))
+    );
+    prompt = { images, text: req.prompt };
+    log('Using image editing mode with', images.length, 'input image(s)');
+  } else {
+    prompt = req.prompt;
+  }
+
   log('Calling generateImage...');
   const startTime = Date.now();
 
   const result = await sdkGenerateImage({
     model: gw.image(model),
-    prompt: req.prompt,
+    prompt,
     ...(req.aspectRatio ? { aspectRatio: req.aspectRatio as `${number}:${number}` } : {}),
     n: req.n,
   });
@@ -132,7 +146,7 @@ const vercelCapabilities: ProviderCapabilities = {
   supportsCustomAspectRatio: true,
   supportsVideoInterpolation: false,
   videoDurationRange: [1, 15],
-  supportsImageEditing: false,
+  supportsImageEditing: true,
 };
 
 export const vercelProvider: Provider = {

@@ -220,7 +220,7 @@ npx climage "morph between frames" --video --provider google --start-frame a.png
 | Feature             | Google | xAI | fal.ai | OpenAI | Vercel AI Gateway     |
 | ------------------- | ------ | --- | ------ | ------ | --------------------- |
 | Image Generation    | Yes    | Yes | Yes    | Yes    | Yes (model-dependent) |
-| Image Editing       | Yes    | Yes | Yes    | Yes    | No                    |
+| Image Editing       | Yes    | Yes | Yes    | Yes    | Yes (model-dependent) |
 | Video Generation    | Yes    | Yes | Yes    | No     | Yes (17+ models)      |
 | Image-to-Video      | Yes    | Yes | Yes    | No     | Yes (model-dependent) |
 | Video Interpolation | Yes    | No  | Yes    | No     | No                    |
