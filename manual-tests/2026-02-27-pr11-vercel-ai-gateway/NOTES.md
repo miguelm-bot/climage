@@ -1,7 +1,7 @@
 # NOTES
 
 Date: 2026-02-27
-Purpose: PR #11 verify Vercel AI Gateway provider (image, video, aspect ratio, start frame).
+Purpose: PR #11/#12 verify Vercel AI Gateway provider (image, video, aspect ratio, start frame, image editing).
 
 Provider/model:
 
@@ -46,6 +46,19 @@ node dist/cli.js "the sun slowly sets and the sky turns orange and purple" \
 ```
 
 - `video-start-frame.mp4` generated in ~28s, 4.0MB. First frame matches input composition.
+
+## 4. Image editing with input image
+
+```bash
+node dist/cli.js "make the sky bright pink and add a rainbow" \
+  --provider vercel \
+  --model xai/grok-imagine-image \
+  --input manual-tests/2026-02-27-pr11-vercel-ai-gateway/image.png \
+  --out manual-tests/2026-02-27-pr11-vercel-ai-gateway/image-edited.png \
+  --verbose
+```
+
+- `image-edited.png` generated in ~8s, 367KB. Edited version of `image.png`.
 
 Notes:
 

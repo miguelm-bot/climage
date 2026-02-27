@@ -32,3 +32,4 @@
   - expected vs observed result
   - commit(s) used (especially for repro/fix cases)
 - Keep both failure and success artifacts (logs, exit codes, images/videos) in the same dated folder when useful.
+- All manual test artifacts (generated images, videos, etc.) must be committed to the `manual-tests/` folder — never leave them only on disk.
