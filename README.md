@@ -23,13 +23,14 @@ Set one of:
 
 **Models:**
 
-| Model                           | Alias             | Description                                                                           |
-| ------------------------------- | ----------------- | ------------------------------------------------------------------------------------- |
-| `gemini-3-pro-image-preview`    | `nano-banana-pro` | **Default.** State-of-the-art, professional asset production, up to 4K, thinking mode |
-| `gemini-2.5-flash-image`        | `nano-banana`     | Fast & efficient, optimized for high-volume tasks                                     |
-| `imagen-4.0-generate-001`       | -                 | Imagen 4 Standard                                                                     |
-| `imagen-4.0-ultra-generate-001` | -                 | Imagen 4 Ultra (best quality)                                                         |
-| `imagen-4.0-fast-generate-001`  | -                 | Imagen 4 Fast                                                                         |
+| Model                            | Alias             | Description                                                                           |
+| -------------------------------- | ----------------- | ------------------------------------------------------------------------------------- |
+| `gemini-3-pro-image-preview`     | `nano-banana-pro` | **Default.** State-of-the-art, professional asset production, up to 4K, thinking mode |
+| `gemini-3.1-flash-image-preview` | `nano-banana-2`   | Nano Banana 2 — fast native image generation                                          |
+| `gemini-2.5-flash-image`         | `nano-banana`     | Fast & efficient, optimized for high-volume tasks                                     |
+| `imagen-4.0-generate-001`        | -                 | Imagen 4 Standard                                                                     |
+| `imagen-4.0-ultra-generate-001`  | -                 | Imagen 4 Ultra (best quality)                                                         |
+| `imagen-4.0-fast-generate-001`   | -                 | Imagen 4 Fast                                                                         |
 
 Example:
 

@@ -22,13 +22,14 @@ npx climage "a cinematic shot of a corgi running" --type video
 
 **Images**
 
-| Model                           | Alias             | Description                                          |
-| ------------------------------- | ----------------- | ---------------------------------------------------- |
-| `gemini-3-pro-image-preview`    | `nano-banana-pro` | **Default.** Best quality, 4K support, thinking mode |
-| `gemini-2.5-flash-image`        | `nano-banana`     | Fast, efficient for high-volume                      |
-| `imagen-4.0-generate-001`       | -                 | Imagen 4 Standard                                    |
-| `imagen-4.0-ultra-generate-001` | -                 | Imagen 4 Ultra                                       |
-| `imagen-4.0-fast-generate-001`  | -                 | Imagen 4 Fast                                        |
+| Model                            | Alias             | Description                                          |
+| -------------------------------- | ----------------- | ---------------------------------------------------- |
+| `gemini-3-pro-image-preview`     | `nano-banana-pro` | **Default.** Best quality, 4K support, thinking mode |
+| `gemini-3.1-flash-image-preview` | `nano-banana-2`   | Nano Banana 2, fast native image gen                 |
+| `gemini-2.5-flash-image`         | `nano-banana`     | Fast, efficient for high-volume                      |
+| `imagen-4.0-generate-001`        | -                 | Imagen 4 Standard                                    |
+| `imagen-4.0-ultra-generate-001`  | -                 | Imagen 4 Ultra                                       |
+| `imagen-4.0-fast-generate-001`   | -                 | Imagen 4 Fast                                        |
 
 **Video (Veo)**
 

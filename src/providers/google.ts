@@ -37,6 +37,7 @@ function log(...args: unknown[]) {
 const MODEL_ALIASES: Record<string, string> = {
   'nano-banana': 'gemini-2.5-flash-image',
   'nano-banana-pro': 'gemini-3-pro-image-preview',
+  'nano-banana-2': 'gemini-3.1-flash-image-preview',
   // Veo (video)
   veo2: 'veo-2.0-generate-001',
   'veo-2': 'veo-2.0-generate-001',
@@ -103,7 +104,11 @@ function imageToVeoFormat(
 }
 
 // Gemini native image models (use generateContent with IMAGE modality)
-const GEMINI_IMAGE_MODELS = ['gemini-2.5-flash-image', 'gemini-3-pro-image-preview'];
+const GEMINI_IMAGE_MODELS = [
+  'gemini-2.5-flash-image',
+  'gemini-3-pro-image-preview',
+  'gemini-3.1-flash-image-preview',
+];
 
 function resolveModel(model: string | undefined): string {
   if (!model) return 'gemini-2.5-flash-image'; // Default: Nano Banana (fast)
