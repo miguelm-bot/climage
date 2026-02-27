@@ -33,3 +33,8 @@
   - commit(s) used (especially for repro/fix cases)
 - Keep both failure and success artifacts (logs, exit codes, images/videos) in the same dated folder when useful.
 - All manual test artifacts (generated images, videos, etc.) must be committed to the `manual-tests/` folder — never leave them only on disk.
+
+## Skill Maintenance
+
+- The skill file at `skills/climage/SKILL.md` documents all providers, models, CLI options, and examples.
+- After any functionality change (new provider, new model, new CLI option, capability change), update the skill file to reflect the change.
